@@ -1,0 +1,202 @@
+#usda 1.0
+(
+    customLayerData = {
+        string creator = "URDF USD Converter v0.1.0"
+    }
+    defaultPrim = "ur5e"
+    doc = """Generated from Composed Stage of root layer /tmp/tmp74qddely/ur5e.usdc
+
+
+Generated from Composed Stage of root layer /workspace/assets/ur5e.usd/usdex/ur5e.usdc
+
+
+Generated from Composed Stage of root layer /workspace/assets/ur5e.usd/temp/ur5e.usd
+
+
+Generated from Composed Stage of root layer /workspace/assets/ur5e.usd/ur5e/payloads/base.usd
+"""
+    kilogramsPerUnit = 1
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+over "ur5e" (
+    prepend apiSchemas = ["IsaacRobotAPI", "IsaacLinkAPI"]
+)
+{
+    custom rel isaac:physics:robotJoints
+    prepend rel isaac:physics:robotJoints = [
+        </ur5e/Physics/base_joint>,
+        </ur5e/Physics/shoulder_pan_joint>,
+        </ur5e/Physics/shoulder_lift_joint>,
+        </ur5e/Physics/elbow_joint>,
+        </ur5e/Physics/wrist_1_joint>,
+        </ur5e/Physics/wrist_2_joint>,
+        </ur5e/Physics/wrist_3_joint>,
+        </ur5e/Physics/tn__base_linkbase_link_inertia_kc0>,
+        </ur5e/Physics/tn__wrist_3_linkft_frame_wT>,
+        </ur5e/Physics/tn__base_linkbase_fixed_joint_Wb0>,
+        </ur5e/Physics/tn__wrist_3flange_mJ>,
+        </ur5e/Physics/tn__flangetool0_oG>,
+    ]
+    custom rel isaac:physics:robotLinks
+    prepend rel isaac:physics:robotLinks = [
+        </ur5e/Geometry/world/base_link>,
+        </ur5e/Geometry/world/base_link/base_link_inertia/shoulder_link>,
+        </ur5e/Geometry/world/base_link/base_link_inertia/shoulder_link/upper_arm_link>,
+        </ur5e/Geometry/world/base_link/base_link_inertia/shoulder_link/upper_arm_link/forearm_link>,
+        </ur5e/Geometry/world/base_link/base_link_inertia/shoulder_link/upper_arm_link/forearm_link/wrist_1_link>,
+        </ur5e/Geometry/world/base_link/base_link_inertia/shoulder_link/upper_arm_link/forearm_link/wrist_1_link/wrist_2_link>,
+        </ur5e/Geometry/world/base_link/base_link_inertia/shoulder_link/upper_arm_link/forearm_link/wrist_1_link/wrist_2_link/wrist_3_link>,
+        </ur5e/Geometry/world/base_link/base_link_inertia>,
+        </ur5e/Geometry/world/base_link/base_link_inertia/shoulder_link/upper_arm_link/forearm_link/wrist_1_link/wrist_2_link/wrist_3_link/ft_frame>,
+        </ur5e/Geometry/world/base_link/base>,
+        </ur5e/Geometry/world/base_link/base_link_inertia/shoulder_link/upper_arm_link/forearm_link/wrist_1_link/wrist_2_link/wrist_3_link/flange>,
+        </ur5e/Geometry/world/base_link/base_link_inertia/shoulder_link/upper_arm_link/forearm_link/wrist_1_link/wrist_2_link/wrist_3_link/flange/tool0>,
+    ]
+
+    over "Physics"
+    {
+        over "base_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "shoulder_pan_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "shoulder_lift_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "elbow_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "wrist_1_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "wrist_2_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "wrist_3_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "tn__base_linkbase_link_inertia_kc0" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "tn__wrist_3_linkft_frame_wT" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "tn__base_linkbase_fixed_joint_Wb0" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "tn__wrist_3flange_mJ" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "tn__flangetool0_oG" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+    }
+
+    over "Geometry"
+    {
+        over "world"
+        {
+            over "base_link" (
+                prepend apiSchemas = ["IsaacLinkAPI"]
+            )
+            {
+                over "base_link_inertia" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "shoulder_link" (
+                        prepend apiSchemas = ["IsaacLinkAPI"]
+                    )
+                    {
+                        over "upper_arm_link" (
+                            prepend apiSchemas = ["IsaacLinkAPI"]
+                        )
+                        {
+                            over "forearm_link" (
+                                prepend apiSchemas = ["IsaacLinkAPI"]
+                            )
+                            {
+                                over "wrist_1_link" (
+                                    prepend apiSchemas = ["IsaacLinkAPI"]
+                                )
+                                {
+                                    over "wrist_2_link" (
+                                        prepend apiSchemas = ["IsaacLinkAPI"]
+                                    )
+                                    {
+                                        over "wrist_3_link" (
+                                            prepend apiSchemas = ["IsaacLinkAPI"]
+                                        )
+                                        {
+                                            over "ft_frame" (
+                                                prepend apiSchemas = ["IsaacLinkAPI"]
+                                            )
+                                            {
+                                            }
+
+                                            over "flange" (
+                                                prepend apiSchemas = ["IsaacLinkAPI"]
+                                            )
+                                            {
+                                                over "tool0" (
+                                                    prepend apiSchemas = ["IsaacLinkAPI"]
+                                                )
+                                                {
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                over "base" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                }
+            }
+        }
+    }
+}
+

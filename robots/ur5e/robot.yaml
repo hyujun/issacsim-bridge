@@ -1,0 +1,35 @@
+robot:
+  # Paths below are relative to this pack directory (ROBOT_PACK).
+  urdf_rel: urdf/ur5e.urdf
+  # URDFImporter writes the asset as a directory bundle; the composed layer is nested.
+  usd_rel: usd/ur5e/ur5e.usda
+  # Stage location for the referenced robot — agnostic of robot name.
+  prim_path: /World/Robot
+  # Child scope under prim_path that contains revolute joint prims (URDFImporter default: "Physics").
+  joints_subpath: Physics
+
+joint_names:
+  - shoulder_pan_joint
+  - shoulder_lift_joint
+  - elbow_joint
+  - wrist_1_joint
+  - wrist_2_joint
+  - wrist_3_joint
+
+home_pose:
+  shoulder_pan_joint: 0.0
+  shoulder_lift_joint: -1.5708
+  elbow_joint: 1.5708
+  wrist_1_joint: -1.5708
+  wrist_2_joint: -1.5708
+  wrist_3_joint: 0.0
+
+drive:
+  mode: position
+  stiffness: 10000.0
+  damping: 100.0
+
+ros:
+  joint_states_topic: /joint_states
+  joint_command_topic: /joint_command
+  publish_rate_hz: 100

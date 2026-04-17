@@ -1,0 +1,66 @@
+services:
+  isaac-sim:
+    image: nvcr.io/nvidia/isaac-sim:6.0.0-dev2
+    container_name: isaac-sim
+    runtime: nvidia
+    network_mode: host
+    ipc: host
+    stdin_open: true
+    tty: true
+    # Image ENTRYPOINT is /isaac-sim/runheadless.sh (streaming kiosk).
+    # Override so our script actually runs, and run as root so /root/.Xauthority
+    # and the /root/.cache/* volume mounts align with the container's $HOME.
+    user: "0:0"
+    entrypoint: ["/isaac-sim/python.sh"]
+    environment:
+      - ACCEPT_EULA=Y
+      - PRIVACY_CONSENT=Y
+      - DISPLAY=${DISPLAY}
+      - XAUTHORITY=/root/.Xauthority
+      - QT_X11_NO_MITSHM=1
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+      - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
+      - ROS_DISTRO=jazzy
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
+      # Container runs as root, host as a regular user. FastDDS SHM transport would
+      # create /dev/shm files root-owned, breaking host<->container delivery.
+      # Force UDPv4-only transport (host must also export this — see SETUP.md).
+      - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+      # isaacsim.ros2.core ships its own rmw/rclpy libs. Must be on LD_LIBRARY_PATH
+      # or the bridge fails with "libament_index_cpp.so: cannot open shared object file".
+      - LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.core/jazzy/lib
+      # Robot pack directory consumed by launch_sim.py. Override via env to swap robots.
+      - ROBOT_PACK=${ROBOT_PACK:-/workspace/robots/ur5e}
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${HOME}/.Xauthority:/root/.Xauthority:rw
+      - ../isaac_scripts:/workspace/scripts:rw
+      - ../robots:/workspace/robots:rw
+      - ../configs:/workspace/configs:rw
+      - isaac-cache-kit:/isaac-sim/kit/cache
+      - isaac-cache-ov:/root/.cache/ov
+      - isaac-cache-pip:/root/.cache/pip
+      - isaac-cache-gl:/root/.cache/nvidia/GLCache
+      - isaac-cache-compute:/root/.nv/ComputeCache
+      - isaac-logs:/root/.nvidia-omniverse/logs
+      - isaac-data:/root/.local/share/ov/data
+      - isaac-docs:/root/Documents
+    command: ["/workspace/scripts/launch_sim.py"]
+
+volumes:
+  isaac-cache-kit:
+  isaac-cache-ov:
+  isaac-cache-pip:
+  isaac-cache-gl:
+  isaac-cache-compute:
+  isaac-logs:
+  isaac-data:
+  isaac-docs:
