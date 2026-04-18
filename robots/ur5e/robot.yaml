@@ -7,6 +7,9 @@ robot:
   prim_path: /World/Robot
   # Child scope under prim_path that contains revolute joint prims (URDFImporter default: "Physics").
   joints_subpath: Physics
+  # URDF root link name. The world-anchor fixed joint (body1 == root_link) must
+  # keep body0 = robot root Xform during repair_joint_chain. Required.
+  root_link: base_link
 
 joint_names:
   - shoulder_pan_joint
@@ -36,7 +39,7 @@ sim:
   # "sync":    external controller drives via /joint_command; each cmd -> one
   #            world.step() -> one /joint_states publish. Heartbeat step fires
   #            after sync_timeout_s wall-clock idle so sim-time keeps advancing.
-  mode: sync
+  mode: freerun
   substeps: 4                # physics_dt = rendering_dt / substeps
   render_rate_hz: 60         # sync-mode maybe_render() wall-clock cadence
   step_rate_hz: 500          # sync-mode: rendering_dt = 1/step_rate_hz

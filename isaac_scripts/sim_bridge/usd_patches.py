@@ -11,17 +11,19 @@ from pxr import Usd, UsdPhysics
 from sim_bridge.config import ROBOT_CFG
 
 
-def repair_joint_chain(prim_path: str, articulation_root_name: str = "base_link") -> int:
+def repair_joint_chain(prim_path: str, articulation_root_name: str) -> int:
     """Rewrite each joint's `physics:body0` to the USD parent of `physics:body1`.
 
-    URDFImporter (Isaac Sim 6.0.0-dev2) emits every joint with
-    `physics:body0 = </ur5e>` (the robot root Xform). That leaves each link
-    attached to the root in a star topology, so Newton parses every body as
-    its own articulation and the manipulator loses its kinematic chain.
+    URDFImporter (Isaac Sim 6.0.0-dev2) emits every joint with `physics:body0`
+    pointing at the robot root Xform. That leaves each link attached to the
+    root in a star topology, so Newton parses every body as its own
+    articulation and the manipulator loses its kinematic chain.
 
     This walks under `prim_path` and points each joint's body0 at the USD
     parent of its body1. The only exception is the fixed joint whose body1 is
-    the articulation root link itself — that one must stay world-anchored.
+    the articulation root link (`articulation_root_name`, from robot.yaml
+    `robot.root_link`) — that one must stay anchored to the robot root so
+    Newton treats it as the world-anchor.
     """
     stage: Usd.Stage = get_current_stage()
     root = stage.GetPrimAtPath(prim_path)
@@ -145,6 +147,18 @@ def apply_drive_gains_to_joints(prim_path: str) -> int:
     leaves the joint un-actuated. Setting stiffness > 0 here promotes the mode
     to POSITION and Newton installs a proper PD servo bound to
     control.joint_target_pos (driven by NewtonArticulationView below).
+
+    Mimic followers (joints whose applied schemas include NewtonMimicAPI or
+    PhysxMimicJointAPI:*, authored by URDFImporter from URDF `<mimic>`) are
+    skipped: their position is determined by the solver-level mimic constraint
+    (joint0 = coef0 + coef1 * joint1). A PD drive on the follower would fight
+    that constraint with a stale target and cause drift under load. Drives
+    belong on leader joints only.
+
+    Both schemas are checked because URDFImporter writes a variant set with
+    per-backend payloads — the default "physx" variant deletes NewtonMimicAPI
+    and substitutes PhysxMimicJointAPI:rotY. Newton's USD importer reads
+    either, so either presence means the joint is a mimic follower.
     """
     stage: Usd.Stage = get_current_stage()
     root_prim = stage.GetPrimAtPath(prim_path)
@@ -155,8 +169,13 @@ def apply_drive_gains_to_joints(prim_path: str) -> int:
     damping = float(drive_cfg["damping"])
 
     count = 0
+    skipped_mimic = 0
     for prim in Usd.PrimRange(root_prim):
         if prim.GetTypeName() != "PhysicsRevoluteJoint":
+            continue
+        applied = prim.GetAppliedSchemas()
+        if any(s == "NewtonMimicAPI" or s.startswith("PhysxMimicJointAPI") for s in applied):
+            skipped_mimic += 1
             continue
         drive = UsdPhysics.DriveAPI.Apply(prim, "angular")
         drive.CreateStiffnessAttr().Set(stiffness)
@@ -164,6 +183,7 @@ def apply_drive_gains_to_joints(prim_path: str) -> int:
         count += 1
     carb.log_warn(
         f"[launch_sim] Patched {count} revolute joints with "
-        f"stiffness={stiffness}, damping={damping}"
+        f"stiffness={stiffness}, damping={damping} "
+        f"(skipped {skipped_mimic} mimic follower(s))"
     )
     return count

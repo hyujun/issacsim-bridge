@@ -44,7 +44,7 @@ simulation_app.update()
 
 import carb  # noqa: E402
 
-from sim_bridge.config import ROBOT_PACK  # noqa: E402
+from sim_bridge.config import ROBOT_CFG, ROBOT_PACK  # noqa: E402
 from sim_bridge.main_loop import run  # noqa: E402
 from sim_bridge.newton_view import setup_newton_articulation  # noqa: E402
 from sim_bridge.robot import assert_newton_backend, build_world, load_robot  # noqa: E402
@@ -59,7 +59,7 @@ from sim_bridge.usd_patches import (  # noqa: E402
 carb.log_warn(f"[launch_sim] Loading robot pack: {ROBOT_PACK}")
 world = build_world()
 art_root = load_robot()
-repair_joint_chain(art_root)
+repair_joint_chain(art_root, ROBOT_CFG["robot"]["root_link"])
 strip_zero_mass_api(art_root)
 populate_robot_schema_links(art_root)
 apply_drive_gains_to_joints(art_root)
