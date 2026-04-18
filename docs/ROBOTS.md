@@ -46,10 +46,19 @@ drive:
   stiffness: 10000.0
   damping: 100.0
 
+# (선택) 루프 동작 방식. 생략하면 전부 기본값 — freerun 모드로 동작.
+# 각 필드의 의미는 docs/ARCHITECTURE.md#시뮬레이션-모드 참조.
+sim:
+  mode: freerun                       # "freerun" | "sync"
+  substeps: 4                         # physics_dt = rendering_dt / substeps
+  render_rate_hz: 60                  # sync 의 maybe_render() wall-clock cadence
+  step_rate_hz: 500                   # sync: rendering_dt = 1/step_rate_hz
+  sync_timeout_s: 0.5                 # sync: cmd 없을 때 heartbeat step 주기
+
 ros:
   joint_states_topic: /joint_states
   joint_command_topic: /joint_command
-  publish_rate_hz: 100
+  publish_rate_hz: 100                # freerun 전용 publisher timer rate
 ```
 
 ## 런타임 계약
@@ -65,6 +74,14 @@ ros:
    - `DriveAPI:angular` 가 `maxForce` 만 가짐 → `apply_drive_gains_to_joints()` 가 `robot.yaml` 의 stiffness/damping 주입.
 
 단위는 ROS 관례대로 **radian** — Newton 내부가 radian 이므로 `JointState` ↔ 내부 상태 간 변환 없이 바로 주고받음. 구 문서가 언급하던 degree 컨벤션은 USD 시절 이야기로, 현재 ArticulationView 경로에선 무관.
+
+### sync 모드의 pack 측 고려사항
+
+`sim.mode: sync` 는 외부 제어기가 `/joint_command` 로 sim 을 drive 한다고 가정합니다. Pack 이 이 모드를 기본으로 쓰려면:
+
+- `step_rate_hz` 를 제어기 제어 주기와 일치시키세요. 예: 500 Hz 제어기 → `step_rate_hz: 500` → `rendering_dt = 2 ms`.
+- `sync_timeout_s` 는 제어기가 일시 중단돼도 sim 이 heartbeat step 으로 살아 있도록 하는 안전망. 제어기 주기의 수십 배 정도면 충분.
+- 제어기가 최초 state 를 기대한다면 **첫 cmd 전에도 heartbeat 로 `/joint_states` 가 timeout 주기로 publish** 되므로 별도 bootstrap 프로토콜 불필요.
 
 ## 스위치 방법
 

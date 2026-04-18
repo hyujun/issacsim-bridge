@@ -14,7 +14,7 @@
 ```
 World.step()             [Isaac Sim 프로세스]
    │
-   ├─ Newton GPU solve   (400Hz 목표, physics_dt = 1/400)
+   ├─ Newton GPU solve   (physics_dt, rendering_dt 는 sim 모드로부터 유도)
    │
    ├─ Newton ArticulationView ────┐
    │  (torch frontend, cuda:0)    │  set_dof_position_targets()  ▲
@@ -25,7 +25,7 @@ World.step()             [Isaac Sim 프로세스]
    └─ simulation loop (Python)     │                              │
         ├─ rclpy.spin_once(0)      │                              │
         ├─ /joint_command → ───────┼──────────────────────────────┘ (write targets)
-        └─ /joint_states  ← ───────┼──────────────────────────────── (read positions)
+        └─ /joint_states  ← ───────┼──────────────────────────────── (read positions, sim-time stamp)
                                    │
                                    │  FastRTPS / CycloneDDS
                                    │  (network_mode: host)
@@ -66,16 +66,59 @@ USD attribute 사이드채널 (`UsdPhysics.JointStateAPI` / `DriveAPI.targetPosi
 
 | 클럭 | 주기 | 출처 |
 |---|---|---|
-| `physics_dt` | 1/400 s | `sim_bridge/robot.py::build_world()` |
-| `rendering_dt` | 1/60 s | `sim_bridge/robot.py::build_world()` |
-| `/clock` | physics tick 마다 | `ROS2PublishClock` OmniGraph |
-| `/joint_states` | `publish_rate_hz` (yaml 기본 100Hz) | rclpy sidechannel (sim 루프) |
-| `/joint_command` | 호스트 publish rate 에 따름 | rclpy sidechannel (sim 루프) |
+| `physics_dt` | `rendering_dt / sim.substeps` | `sim_bridge/robot.py::build_world()` |
+| `rendering_dt` | freerun: `1/render_rate_hz` · sync: `1/step_rate_hz` | `build_world()` |
+| `/clock` | physics tick 마다 (sync: cmd 도착 · heartbeat 시점에만 전진) | `ROS2PublishClock` OmniGraph |
+| `/joint_states` | freerun: `publish_rate_hz` timer · sync: 매 `world.step()` 직후 | rclpy sidechannel |
+| `/joint_command` | 호스트 publish rate 에 따름 | rclpy sidechannel |
+| `JointState.header.stamp` | sim-time (`omni.timeline`) — `/clock` 과 동일 타임베이스 | `sim_bridge/main_loop.py` |
 | 호스트 `use_sim_time` | `/clock` 구독 | 호스트 ROS 2 노드 설정 |
 
-호스트 노드가 `use_sim_time: true` 를 사용하면 시뮬 시간 기준으로 동작하므로 wall-clock drift 영향을 받지 않습니다.
+호스트 노드가 `use_sim_time: true` 를 사용하면 `header.stamp` 와 `/clock` 이 정확히 일치합니다 (양쪽 모두 `omni.timeline` 기반).
 
-> **주의 (2026-04 기준)**: `/joint_states` 실측은 **~54 Hz** 입니다. `main_loop.py` 가 `world.step(render=True)` 로 렌더 틱에 동기화돼 60 Hz 를 넘지 못해서, yaml 의 `publish_rate_hz: 100` 은 상한이지 실제 rate 가 아닙니다. 해결 옵션은 [PLAN.md](PLAN.md) Phase 4 참고.
+## 시뮬레이션 모드
+
+`robot.yaml` 의 `sim.mode` 로 루프 동작 방식을 선택합니다. 기본값 `freerun`, 외부 RT 제어기 연동 시 `sync`.
+
+### freerun
+
+```
+loop:
+    world.step(render=True)        # sim-time += 1/render_rate_hz
+    apply_cmd (있으면)
+    spin_once(0)
+    if timer due: publish /joint_states
+```
+
+- GUI 관찰 / 테스트 주도 개발 / 외부 제어기 미연동 시.
+- publish rate 는 `ros.publish_rate_hz` timer. render 가 60 Hz 에 묶여 있으므로 그 이상은 aliasing (같은 state 반복 pub).
+
+### sync (lock-step on `/joint_command`)
+
+```
+loop:
+    got_cmd = wait_cmd_or_timeout(sync_timeout_s)      # rclpy.spin_once + maybe_render
+    if got_cmd: apply_cmd
+    world.step(render=False)                           # sim-time += 1/step_rate_hz
+    publish /joint_states (sim-time stamp)
+    maybe_render()                                     # simulation_app.update() at render_rate_hz wall-clock
+```
+
+- 외부 제어기 1 tick = `/joint_command` 1 publish. sim 은 그 tick 에 **정확히 한 번** step + publish.
+- `sync_timeout_s` 동안 cmd 없으면 **heartbeat step** — 마지막 target 을 유지한 채 1 step + publish. 첫 cmd 이전에도 동일 → bootstrap 데드락 없음.
+- `rendering_dt = 1/step_rate_hz` 라 한 tick 이 `step_rate_hz` 에 상응하는 sim-time 을 전진 (예: 500 → 2 ms). substeps=4 이면 physics 내부적으로 4 번 적분.
+- **render 와 physics 분리**: `world.step()` 은 항상 `render=False`. GUI 는 `simulation_app.update()` 를 `render_rate_hz` wall-clock cadence 로 호출하는 `maybe_render()` 가 담당. cmd 없이 대기 중에도 GUI 살아있음.
+- wall-clock 페이싱 없음 — 제어기 publish 속도가 sim 속도를 결정. 제어기가 느리면 sim 도 느리고, 빠르면 GPU 포화 수준에서 사무중.
+
+### 세 가지 호출의 책임 분담 (sync 모드에서 중요)
+
+| 호출 | physics 전진 | Kit 프레임 (render + UI + extensions) |
+|---|---|---|
+| `world.step(render=True)` | ✅ | ✅ (freerun 에서 사용) |
+| `world.step(render=False)` | ✅ | ❌ (sync 모드 active step) |
+| `simulation_app.update()` | ❌ | ✅ (sync 의 `maybe_render`, 대기 중 GUI 유지) |
+
+이 분리가 없으면 sync 모드에서 cmd 대기 중에 GUI 가 freeze 됩니다 (Kit extension tick 도 정지).
 
 ## 레이어 분리 — agnostic vs robot-specific
 

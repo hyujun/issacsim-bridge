@@ -70,12 +70,22 @@ Isaac Sim GUI 창이 뜨고, 터미널에는 다음 로그가 보여야 함 (UR5
 ```
 [launch_sim] Loading robot pack: /workspace/robots/ur5e
 [launch_sim] Robot referenced: /workspace/robots/ur5e/usd/ur5e/ur5e.usda -> /World/Robot
+[launch_sim] World dt: mode=freerun rendering_dt=0.01667s physics_dt=0.00417s substeps=4
 [launch_sim] Repaired joint chain: rewrote body0 on 11 joints, kept 1 world-anchor joint(s)
 [launch_sim] Patched 6 revolute joints with stiffness=10000.0, damping=100.0
 [launch_sim] Newton articulation ready: count=1 max_dofs=6 dof_names=['shoulder_pan_joint', ..., 'wrist_3_joint']
 [launch_sim] rclpy bridge ready: publish /joint_states, subscribe /joint_command
 [PhysicsBackendCheck] physxScene:solverType=TGS
 [launch_sim] Newton + ROS2 bridge + robot bootstrap complete. Running simulation loop.
+```
+
+`sim.mode: sync` 로 전환 시 대신 다음 로그가 추가로 보임:
+
+```
+[launch_sim] World dt: mode=sync rendering_dt=0.002s physics_dt=0.0005s substeps=4
+...
+[sync] waiting for /joint_command (timeout=0.5s, step_rate=500Hz, render=60Hz)
+[sync] first command received, entering lock-step loop   # 첫 cmd 수신 시 1회
 ```
 
 `count=1` 과 `max_dofs=<n>` 이 pack 의 `joint_names` 길이와 일치해야 합니다. `count=0` 이면 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) 의 "Newton ArticulationView matched no articulations" / "Newton model articulations: [...] split" 참조.

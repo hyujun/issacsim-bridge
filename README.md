@@ -14,7 +14,7 @@ Isaac Sim (Newton physics backend) ↔ ROS 2 Jazzy 브리지 환경. 컨테이�
 │   │                                                   │ │
 │   │   isaacsim.physics.newton (differentiable physics)│ │
 │   │   isaacsim.ros2.bridge   → /clock publisher       │ │
-│   │   World (400Hz physics, 60Hz render, GUI)         │ │
+│   │   World (freerun | sync lock-step, GUI)           │ │
 │   └───────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -76,12 +76,12 @@ issacsim-bridge/
 - [x] Phase 5 — UR5e 로드 + joint bridge
     - [x] URDF → USD 변환, GUI 에 UR5e 표시, `/clock` 정상
     - [x] OmniGraph joint bridge 포기 (PhysX-tensor SEGV) → rclpy sidechannel + Newton ArticulationView
-    - [x] `/joint_states` ~54 Hz publish, `/joint_command` 로 shoulder_pan 구동 검증
-- [~] Phase 5b — 런타임 cleanup (진행 중, 상세 [docs/PLAN.md](docs/PLAN.md))
+    - [x] `/joint_states` publish + `/joint_command` 로 shoulder_pan 구동 검증
+- [x] Phase 5b — 런타임 cleanup
     - [x] `sim_bridge/` 패키지 분리 (launch_sim.py 슬림)
     - [x] USD warning 정리 (zero-mass MassAPI strip, isaac:physics:robotLinks 재작성)
-    - [ ] py-stderr UserWarning suppression
-    - [ ] publish rate render-bound 해결 (선택)
+    - [x] py-stderr UserWarning suppression
+    - [x] Dual-mode publish loop — **freerun** (기존 동작 유지) + **sync** (외부 제어기 lock-step, `/joint_command` → 1 step → `/joint_states`; `sync_timeout_s` heartbeat). 상세: [docs/ARCHITECTURE.md#시뮬레이션-모드](docs/ARCHITECTURE.md#시뮬레이션-모드)
 - [ ] Phase 6 — robot-agnostic 레이어 검증 + 두 번째 로봇 (hand) 투입
 
 자세한 설계 논의는 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), robot pack 규약은 [docs/ROBOTS.md](docs/ROBOTS.md), 셋업 절차는 [docs/SETUP.md](docs/SETUP.md), 트러블슈팅은 [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).

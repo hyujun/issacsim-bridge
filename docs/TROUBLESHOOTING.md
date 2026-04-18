@@ -249,12 +249,33 @@ Could not load … librmw_implementation.so. Error: libament_index_cpp.so: canno
 ```
 (python.sh 가 자신의 라이브러리 경로를 앞쪽에 prepend 하므로 기존 경로와 충돌하지 않음.)
 
+## Sim 모드 (freerun / sync)
+
+### sync 모드에서 로봇이 안 움직이고 `/joint_states` 가 `sync_timeout_s` 간격으로만 pub 됨
+정상 동작. sync 모드는 `/joint_command` 도착 때마다 step → publish 하는 lock-step 루프. cmd 가 없으면 `sync_timeout_s` (기본 0.5 s) 주기로 heartbeat step 만 실행. 해결:
+```bash
+# 호스트에서 cmd 가 실제로 나가는지 확인
+ros2 topic echo /joint_command
+# 안 나가면 제어기 쪽 문제. 나가는데 반응 없으면 sim 쪽 로그 확인 — "[sync] first command received" 가 찍혔어야 함.
+```
+
+### sync 모드에서 GUI 가 얼어붙음
+`maybe_render()` 가 호출 안 되는 경우. 현재 코드에선 wait loop 와 active step 양쪽에서 `simulation_app.update()` 를 60 Hz (기본) wall-clock 케이던스로 펌핑함. 직접 수정한 버전에서 freeze 하면 `sim_bridge/main_loop.py::_run_sync` 의 `maybe_render()` 호출 누락 여부 점검. `render_rate_hz` 를 낮추면 GUI 프레임도 낮아지지만 freeze 는 아니어야 함.
+
+### sync 모드에서 제어기가 state 보고 시간 불일치 (`use_sim_time:=true` 기준)
+sync 모드는 `header.stamp` 를 `omni.timeline.get_current_time()` (sim-time) 으로 채움. `/clock` 도 sim-time 기준이므로 `use_sim_time:=true` 구독자는 stamp 와 clock 이 일치해야 함. 불일치하면:
+1. 호스트 노드에 `use_sim_time:=true` 가 실제로 적용됐는지 (`ros2 param get <node> use_sim_time`).
+2. wall-clock 기준으로 돌리는 제어기라면 반대로 `use_sim_time:=false` + 호스트 쪽 시간 보정 필요. sync 모드는 wall-clock 기준으로 sim-time 이 늦을 수 있음 (sim 은 cmd 도착 시점에만 전진).
+
+### freerun 모드에서 publish rate 가 `publish_rate_hz` 보다 낮음
+정상. freerun 은 `world.step(render=True)` 가 `rendering_dt = 1/60` 케이던스에 묶임 → publish rate 상한 ≈ 60 Hz. yaml 의 `publish_rate_hz: 100` 은 timer 상한일 뿐 실제 rate 보장 아님. 100 Hz 이상이 필요하면 `sim.mode: sync` 로 전환 후 제어기가 원하는 rate 로 `/joint_command` 쏘기.
+
 ## 성능
 
-### 물리 주기 400Hz 미달
-GUI 렌더가 물리를 늦춥니다. 진단:
-- `rendering_dt` 를 1/30 으로 낮추기
-- 또는 headless 모드로 전환 (`launch_sim.py` `CONFIG["headless"] = True`)
+### 물리 주기 미달
+GUI 렌더가 물리를 늦추는 경우:
+- freerun: `rendering_dt` 는 `render_rate_hz` 로 결정됨. `render_rate_hz` 를 낮추면 frame 당 physics substep 이 늘어남.
+- sync: physics 는 `step_rate_hz` 로 결정되고 render 는 별개 (`maybe_render()`). 렌더 부하가 sim 에 영향 주면 `render_rate_hz` 를 낮추거나 headless 전환 (`launch_sim.py` `CONFIG["headless"] = True`).
 
 ### GPU 메모리 부족
 Isaac Sim 초기 로딩이 큼. 다른 GPU 프로세스 종료 후 재시도. 필요 시 텍스처 해상도 낮은 씬으로 교체.
