@@ -1,16 +1,16 @@
 # Robots
 
-`launch_sim.py` 는 로봇에 대해 모릅니다. 실행 시 `ROBOT_PACK` 환경변수 하나만 보고, 해당 디렉토리의 **robot pack** 규약대로 에셋과 설정을 읽어 스테이지에 로드합니다. 새 로봇을 추가하는 일은 곧 새 pack 을 만드는 일입니다.
+`launch_sim.py` + `sim_bridge/` 는 로봇에 대해 모릅니다. 실행 시 `ROBOT_PACK` 환경변수 하나만 보고, 해당 디렉토리의 **robot pack** 규약대로 에셋과 설정을 읽어 스테이지에 로드합니다. 새 로봇을 추가하는 일은 곧 새 pack 을 만드는 일입니다.
 
 ## 레이어 경계
 
 | 레이어 | 성격 | 위치 |
 |---|---|---|
-| Isaac Sim bootstrap (Newton, ROS 2 bridge, `/clock`, joint bridge 루프) | **robot-agnostic** | `isaac_scripts/launch_sim.py` |
+| Isaac Sim bootstrap (Newton, ROS 2 bridge, `/clock`, joint bridge 루프) | **robot-agnostic** | `isaac_scripts/launch_sim.py` + `isaac_scripts/sim_bridge/` |
 | Sim/infra 설정 (Docker, ROS 도메인, FastDDS 전송) | **robot-agnostic** | `docker/`, `install.sh`, `build.sh`, `run.sh` |
 | URDF, USD, joint 이름, home pose, drive 게인 | **robot-specific** | `robots/<name>/` |
 
-`launch_sim.py` 안에는 로봇 이름·조인트 수·드라이브 튜닝이 하드코딩돼 있지 않습니다. 반대로 `robots/<name>/` 안에는 Isaac Sim 부트스트랩 코드가 들어가지 않습니다.
+`launch_sim.py` / `sim_bridge/` 안에는 로봇 이름·조인트 수·드라이브 튜닝이 하드코딩돼 있지 않습니다. 반대로 `robots/<name>/` 안에는 Isaac Sim 부트스트랩 코드가 들어가지 않습니다.
 
 ## Pack 디렉토리 레이아웃
 
@@ -31,7 +31,7 @@ robot:
   urdf_rel: urdf/<name>.urdf          # pack 기준 상대경로
   usd_rel: usd/<name>/<name>.usda     # URDFImporter 출력 내부 경로
   prim_path: /World/Robot             # 스테이지 위치. 관례상 agnostic 이름
-  joints_subpath: Physics             # prim_path 밑에서 joint 를 찾을 하위 스코프
+  joints_subpath: Physics             # 참고용 — Newton ArticulationView 가 DOF 이름을 자동 매핑하므로 실제 조회에는 사용되지 않음
 
 joint_names:                          # /joint_states, /joint_command 순서가 이 순서로 고정
   - joint_a
@@ -54,13 +54,15 @@ ros:
 
 ## 런타임 계약
 
-`launch_sim.py` 가 pack 에 대해 가정하는 것:
+`sim_bridge/` 가 pack 에 대해 가정하는 것:
 
-1. `{prim_path}/{joints_subpath}/<joint_name>` 경로에 `PhysicsRevoluteJoint` prim 이 존재한다.
-2. 그 prim 에 `UsdPhysics.DriveAPI:angular` 와 `UsdPhysics.JointStateAPI:angular` schema 가 붙어 있다.
-3. 각도 단위는 USD 규약 대로 **degree** (내부에서 ROS 의 radian 과 변환).
+1. `prim_path` 밑 어딘가에 `joint_names` 와 매칭되는 `PhysicsRevoluteJoint` prim 들이 존재한다. (정확한 하위 경로는 자유 — Newton ArticulationView 가 DOF 이름으로 매핑.)
+2. `prim_path` 계층 어딘가의 prim 이 `PhysicsArticulationRootAPI` 또는 `NewtonArticulationRootAPI` 를 가진다. 이름·위치는 자유 — `sim_bridge/robot.py::find_articulation_root_path()` 가 스키마로 스캔.
+3. URDFImporter 출력의 알려진 결함 두 가지는 `sim_bridge/usd_patches.py` 의 runtime patch 로 교정되므로 pack 에서 추가 작업 불필요:
+   - 모든 조인트의 `physics:body0` 이 robot root 로 고정된 star topology → `repair_joint_chain()` 이 `parent(body1)` 로 재작성.
+   - `DriveAPI:angular` 가 `maxForce` 만 가짐 → `apply_drive_gains_to_joints()` 가 `robot.yaml` 의 stiffness/damping 주입.
 
-위 조건은 Isaac Sim 6.0.0-dev2 의 `URDFImporter` 기본 출력에서 자동으로 충족됩니다. 다른 importer 를 쓰면 pack 에서 변환해 맞추거나 `joints_subpath` 만 조정하면 됩니다.
+단위는 ROS 관례대로 **radian** — Newton 내부가 radian 이므로 `JointState` ↔ 내부 상태 간 변환 없이 바로 주고받음. 구 문서가 언급하던 degree 컨벤션은 USD 시절 이야기로, 현재 ArticulationView 경로에선 무관.
 
 ## 스위치 방법
 

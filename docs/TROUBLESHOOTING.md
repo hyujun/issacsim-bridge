@@ -137,7 +137,40 @@ world = World(
 
 근본 원인: 이 3개 노드는 PhysX-tensor C++ 런타임이 articulation 을 tensor view 로 잡아야 동작합니다. 6.0.0-dev2 의 `URDFImporter` 는 Newton 쪽 schema (`NewtonArticulationRootAPI`) 와 PhysX 쪽 schema 가 섞인 출력을 내놓는데, Newton backend 아래에서는 PhysX-tensor 가 이 articulation 을 인식하지 못하고 null 포인터를 탑니다. **Python `isaacsim.core.api.articulations.Articulation` 래퍼도 동일 경로를 타므로 같은 위험이 있습니다.**
 
-해결: joint bridge 를 OmniGraph 가 아니라 **rclpy sidechannel** 로 구현. 조인트 prim 의 `UsdPhysics.JointStateAPI:angular.position` 을 읽고 `UsdPhysics.DriveAPI:angular.targetPosition` 에 쓰는 방식. 단위는 USD 규약대로 degree 이므로 ROS radian 과 변환 필요. 현재 `launch_sim.py` 에 `setup_joint_drives()` + `setup_rclpy_bridge()` 로 구현돼 있음. 향후 PhysX-tensor 가 Newton articulation 을 안전히 감싸게 되면 OmniGraph 경로로 되돌릴 수 있음.
+해결: joint bridge 를 OmniGraph 가 아니라 **rclpy sidechannel** 로 구현. Newton 의 tensor **ArticulationView** (`sim_bridge/newton_view.py` 에서 `create_simulation_view("torch", ...)` → `create_articulation_view(<ArticulationRootAPI prim path>)` 로 생성) 의 `get_dof_positions(copy=True)` 로 상태를 읽고 `set_dof_position_targets(buffer, indices0)` 로 명령을 기록. 단위는 radian — Newton 내부가 radian 이므로 ROS 와 변환 불필요. 향후 PhysX-tensor 가 Newton articulation 을 안전히 감싸게 되면 OmniGraph 경로로 되돌릴 수 있음.
+
+### `AttributeError: module 'pxr.UsdPhysics' has no attribute 'JointStateAPI'`
+증상: joint 상태를 USD attribute 사이드채널로 읽으려 `UsdPhysics.JointStateAPI.Get(prim, "angular")` 호출 시 터짐.
+
+근본 원인: Isaac Sim 6.0.0-dev2 가 번들하는 OpenUSD 빌드의 `pxr.UsdPhysics` 에는 `JointStateAPI` 가 없습니다. 이 스키마는 `PhysxSchema.JointStateAPI` 로 옮겨감 (USD string schema 이름은 여전히 `PhysicsJointStateAPI`). `launch_sim.py` 는 이 경로 자체를 포기하고 Newton ArticulationView tensor API 로 우회합니다 — USD attribute 사이드채널이 필요해지면 `PhysxSchema.JointStateAPI.Get(prim, "angular")` 를 써야 합니다.
+
+### `The Numpy frontend cannot be used with GPU pipelines`
+증상: `newton_tensors.create_simulation_view("numpy", newton_stage)` 호출 시 Exception.
+
+근본 원인: `World(device="cuda:0")` 로 GPU 파이프라인을 쓰면 Newton tensor frontend 도 GPU-호환이어야 합니다. `numpy` 프런트엔드는 CPU 전용. 해결: `create_simulation_view("torch", newton_stage)` (`sim_bridge/newton_view.py` 에서 채택) 또는 `"warp"`.
+
+### `Newton ArticulationView matched no articulations for pattern '/World/Robot'`
+증상: `sim_view.create_articulation_view("/World/Robot")` 이 `count=0` 반환 → 이후 `set_dof_position_targets` 가 무동작.
+
+근본 원인: Newton 의 `articulation_label` 은 `PhysicsArticulationRootAPI` / `NewtonArticulationRootAPI` 가 **붙은 prim 의 전체 경로** 로 매칭합니다. URDFImporter 출력은 ArticulationRootAPI 를 레퍼런스 앵커 (`/World/Robot`) 가 아니라 kinematic base link (`/World/Robot/Geometry/world/base_link`) 에 붙입니다. pattern 으로 앵커를 주면 매칭 실패.
+
+해결: `sim_bridge/robot.py::find_articulation_root_path()` 가 robot prim 하위를 순회해 스키마가 적용된 prim 경로를 자동 반환. 그걸 `create_articulation_view()` 에 넘기면 정상 매칭됨. robot pack 에 따라 base link 이름이 달라져도 스키마 기준이라 그대로 작동.
+
+### `Newton model articulations: [...]` 에 여러 엔트리 / `max_dofs=0`
+증상: `newton_stage.model.articulation_label` 출력이 링크별로 쪼개져 나열되고 ArticulationView 의 `max_dofs=0`. 로봇이 가만히 있음.
+
+근본 원인: URDFImporter 6.0.0-dev2 가 **모든 조인트의 `physics:body0` 를 robot root (`</robot_name>`) 로** 설정 — star topology. robot root 는 `RigidBodyAPI` 가 없어 Newton 이 유효한 부모로 인식 못 하고, 각 링크를 독립 articulation 으로 파싱. 결과적으로 각 "articulation" 에 DOF 가 하나도 없음.
+
+해결: `sim_bridge/usd_patches.py::repair_joint_chain()` 가 pre-reset 에 각 joint 의 `body0` 를 `parent(body1)` 로 재작성. 예외는 `base_link` 를 world 에 고정하는 fixed joint 하나 — 얘는 body0=robot root 를 유지해야 함 (Newton 이 robot root 를 world 로 취급). 재작성 후 `articulation_label` 이 단일 엔트리 + `max_dofs=6` 이 나옵니다.
+
+### `MuJoCo actuator N has unresolved target '/World/Robot/Physics/<joint>'. Skipping actuator.`
+증상: `solver_mujoco.py::_init_actuators` 에서 UserWarning 반복. stderr 로 나가 carb 가 Error 레벨로 찍음.
+
+근본 원인: DriveAPI 에 stiffness/damping 이 없으면 Newton 은 `JointTargetMode.EFFORT` 로 떨어져 CTRL_DIRECT motor actuator 를 설치하려 시도하고, 그 target 이 solver 내부 이름 해상도에 실패해 경고만 찍고 skip. 실제 actuator 가 없으니 조인트가 움직이지 않음.
+
+해결 두 가지:
+1. stiffness/damping 을 DriveAPI 에 주입해 Newton 을 `POSITION` 모드로 끌어올림. `sim_bridge/usd_patches.py::apply_drive_gains_to_joints()` 가 pre-reset 에 `robot.yaml.drive.{stiffness,damping}` 을 모든 PhysicsRevoluteJoint 에 기록. POSITION 경로의 JOINT_TARGET actuator 는 다른 코드 경로로 바인딩되므로 경고 없이 설치됨.
+2. 그래도 경고가 남으면 cosmetic — actuator 동작 여부는 `/joint_command` 로 실동작 확인으로 판정. 경고만 가지고 디버깅 들어가지 말 것 (memory: "MuJoCo unresolved-target warnings are cosmetic").
 
 ### rclpy import 실패 (`ModuleNotFoundError: No module named 'rclpy'`)
 컨테이너 안에서 `launch_sim.py` 가 `import rclpy` 에서 죽는 경우. Isaac Sim 6.0.0-dev2 는 `isaacsim.ros2.bridge` 가 활성화될 때 번들 rclpy 를 sys.path 에 등록합니다. 증상이 나오면 다음을 순서대로 확인:

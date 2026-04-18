@@ -65,11 +65,20 @@ docker login nvcr.io    # NGC 인증 (한 번만)
 ./run.sh
 ```
 
-Isaac Sim GUI 창이 뜨고, 터미널에는 다음 로그가 보여야 함:
+Isaac Sim GUI 창이 뜨고, 터미널에는 다음 로그가 보여야 함 (UR5e pack 기준 — 숫자는 로봇마다 달라짐):
 
 ```
-[launch_sim] Newton + ROS2 bridge bootstrap complete. Running simulation loop.
+[launch_sim] Loading robot pack: /workspace/robots/ur5e
+[launch_sim] Robot referenced: /workspace/robots/ur5e/usd/ur5e/ur5e.usda -> /World/Robot
+[launch_sim] Repaired joint chain: rewrote body0 on 11 joints, kept 1 world-anchor joint(s)
+[launch_sim] Patched 6 revolute joints with stiffness=10000.0, damping=100.0
+[launch_sim] Newton articulation ready: count=1 max_dofs=6 dof_names=['shoulder_pan_joint', ..., 'wrist_3_joint']
+[launch_sim] rclpy bridge ready: publish /joint_states, subscribe /joint_command
+[PhysicsBackendCheck] physxScene:solverType=TGS
+[launch_sim] Newton + ROS2 bridge + robot bootstrap complete. Running simulation loop.
 ```
+
+`count=1` 과 `max_dofs=<n>` 이 pack 의 `joint_names` 길이와 일치해야 합니다. `count=0` 이면 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) 의 "Newton ArticulationView matched no articulations" / "Newton model articulations: [...] split" 참조.
 
 ## Bridge 동작 검증
 
