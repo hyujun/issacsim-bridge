@@ -7,14 +7,32 @@ from isaacsim.core.api import World
 from isaacsim.core.utils.stage import add_reference_to_stage, get_current_stage
 from pxr import Usd, UsdPhysics
 
-from sim_bridge.config import ROBOT_CFG, ROBOT_PACK
+from sim_bridge.config import ROBOT_CFG, ROBOT_PACK, SIM_CFG
 
 
 def build_world() -> World:
+    # rendering_dt is the sim-time advanced per world.step() call (Isaac naming
+    # predates render/physics decoupling — it is NOT the render Hz).
+    #   freerun: one step = 1/render_rate_hz sim-time, step_rate_hz unused.
+    #   sync:    one step = 1/step_rate_hz sim-time; maybe_render() owns the
+    #            actual render cadence via simulation_app.update().
+    substeps = int(SIM_CFG["substeps"])
+    if SIM_CFG["mode"] == "sync":
+        rendering_dt = 1.0 / float(SIM_CFG["step_rate_hz"])
+    else:
+        rendering_dt = 1.0 / float(SIM_CFG["render_rate_hz"])
+    physics_dt = rendering_dt / substeps
+
+    carb.log_warn(
+        f"[launch_sim] World dt: mode={SIM_CFG['mode']} "
+        f"rendering_dt={rendering_dt:.6g}s physics_dt={physics_dt:.6g}s "
+        f"substeps={substeps}"
+    )
+
     world = World(
         stage_units_in_meters=1.0,
-        physics_dt=1.0 / 400.0,
-        rendering_dt=1.0 / 60.0,
+        physics_dt=physics_dt,
+        rendering_dt=rendering_dt,
         backend="torch",
         device="cuda:0",
     )

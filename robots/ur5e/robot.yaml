@@ -29,7 +29,20 @@ drive:
   stiffness: 10000.0
   damping: 100.0
 
+# Simulation loop configuration. See docs/ARCHITECTURE.md#simulation-modes.
+# All fields have defaults in sim_bridge/config.py — omit any to use defaults.
+sim:
+  # "freerun": sim steps at render_rate_hz, publishes on publish_rate_hz timer.
+  # "sync":    external controller drives via /joint_command; each cmd -> one
+  #            world.step() -> one /joint_states publish. Heartbeat step fires
+  #            after sync_timeout_s wall-clock idle so sim-time keeps advancing.
+  mode: sync
+  substeps: 4                # physics_dt = rendering_dt / substeps
+  render_rate_hz: 60         # sync-mode maybe_render() wall-clock cadence
+  step_rate_hz: 500          # sync-mode: rendering_dt = 1/step_rate_hz
+  sync_timeout_s: 0.5        # sync-mode: wall-clock idle before heartbeat step
+
 ros:
   joint_states_topic: /joint_states
   joint_command_topic: /joint_command
-  publish_rate_hz: 100
+  publish_rate_hz: 100       # freerun-mode publisher timer rate
