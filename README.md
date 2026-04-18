@@ -1,4 +1,4 @@
-# sim-bridge
+# issacsim-bridge
 
 Isaac Sim (Newton physics backend) ↔ ROS 2 Jazzy 브리지 환경. 컨테이너에서 Isaac Sim GUI를 띄우고 `network_mode: host` 를 통해 호스트 ROS 2 와 토픽을 주고받습니다.
 
@@ -37,7 +37,7 @@ ros2 topic hz /clock
 ## 프로젝트 구조
 
 ```
-sim-bridge/
+issacsim-bridge/
 ├── README.md               ← 여기
 ├── install.sh              호스트 prereq 설치·검증              ┐
 ├── build.sh                docker compose pull                 │ robot-agnostic

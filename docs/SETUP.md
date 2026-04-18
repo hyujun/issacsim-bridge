@@ -53,7 +53,7 @@ Isaac Sim 이미지는 `nvcr.io` 인증이 필요합니다.
 ## 최초 기동 절차
 
 ```bash
-cd /home/junho/ros2_ws/sim-bridge
+cd issacsim-bridge     # 클론한 디렉토리로 이동
 
 ./install.sh
 # docker 그룹이 새로 추가되었다면:
