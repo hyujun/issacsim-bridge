@@ -1,14 +1,15 @@
-# PLAN — remaining cleanup after Phase 2
+# PLAN — remaining cleanup after Phase 3
 
-> **이 문서의 목적**: 다음 Claude 대화가 이어서 실행할 수 있도록 정리한 handoff. 2026-04-18 세션에서 Phase 1 (sim_bridge/ 패키지 분리), Phase 2 (수정 가능한 USD warning 정리), Phase 5 (docs 업데이트) 는 끝났으므로, 이 문서는 Phase 3–4 만 남김. Phase 4 까지 마치면 이 파일은 삭제.
+> **이 문서의 목적**: 다음 Claude 대화가 이어서 실행할 수 있도록 정리한 handoff. 2026-04-18 세션에서 Phase 1 (sim_bridge/ 패키지 분리), Phase 2 (수정 가능한 USD warning 정리), Phase 3 (Python `warnings` 필터), Phase 5 (docs 업데이트) 는 끝났으므로, 이 문서는 Phase 4 만 남김. Phase 4 까지 마치면 이 파일은 삭제.
 
 ## 배경 — 현재 상태
 
-Phase 2 기준:
+Phase 3 기준:
 
 - Isaac Sim 6.0.0-dev2 Newton 백엔드 + UR5e 로봇 + ROS 2 Jazzy bridge end-to-end 동작.
 - `launch_sim.py` 는 SimulationApp 부팅 + 오케스트레이션만. 런타임 로직은 `isaac_scripts/sim_bridge/{config,usd_patches,robot,newton_view,ros_bridge,main_loop}.py`.
 - `usd_patches.py` 에 runtime 패치 4 종: `repair_joint_chain`, `strip_zero_mass_api`, `populate_robot_schema_links`, `apply_drive_gains_to_joints` — 모두 `world.reset()` 이전에 pre-parse 된 stage 에 돌아감.
+- `launch_sim.py` 최상단 (SimulationApp 이전) 에 `warnings.filterwarnings` 4종: Newton 의 per-prim zero-mass UserWarning 스팸과 MuJoCo 의 per-actuator unresolved warning 을 Python 레벨에서 침묵. pxr.Semantics (omni.log.warn 직행) 와 warp (자체 `catch_warnings` 로 필터 리셋) 는 Python warnings 우회 — 1회성 startup 로그로 남음 (의도된 상태).
 - 5 개 docs (README / ARCHITECTURE / ROBOTS / TROUBLESHOOTING / SETUP) 는 Newton ArticulationView 아키텍처 + sim_bridge/ 레이아웃에 맞춰 업데이트 완료.
 
 ## 원칙 / 제약
@@ -19,19 +20,6 @@ Phase 2 기준:
 - Hard constraint: Newton backend 유지, `ROBOT_PACK` 한 줄로 로봇 교체 가능, 번들 rclpy (`LD_LIBRARY_PATH=/isaac-sim/exts/isaacsim.ros2.core/jazzy/lib`).
 
 ## 작업 범위
-
-### Phase 3 — py-stderr UserWarning 소음 억제
-
-현재 로그의 `[Error] [omni.kit.app._impl] [py stderr]: /isaac-sim/.../newton/.../solver_mujoco.py:...: UserWarning: ...` 류는 Newton 내부 warning 이 stderr 로 나가 carb 가 Error 레벨로 찍는 것. 우리가 억제할 수 있는 것만:
-
-- `warnings.filterwarnings("ignore", category=UserWarning, module=r"newton\._src\..*")`
-- `warnings.filterwarnings("ignore", category=UserWarning, module=r"warp\..*")`
-- `warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"warp\..*")`
-- `warnings.filterwarnings("ignore", category=DeprecationWarning, message=r".*pxr\.Semantics is deprecated.*")`
-
-`launch_sim.py` 최상단 (SimulationApp 생성 전) 에 둔다. 너무 광범위한 suppress 는 금지 — 우리 코드 warning 은 통과해야 함.
-
-완료 기준: 로그가 "Body .. zero mass" / "pxr.Semantics deprecated" / "warp.context.Kernel will soon be removed" / "MuJoCo actuator N unresolved" 계열 모두 침묵. Phase 2 에서 실제로 사라지는 경고와 구분해 개별 커밋.
 
 ### Phase 4 — publish rate 54 Hz → 100 Hz (별도 이슈, 선택)
 
@@ -45,9 +33,8 @@ Phase 2 기준:
 
 ## 권장 커밋 단위
 
-1. `warnings.filterwarnings` 노이즈 억제.
-2. (선택) publish rate 수정.
-3. `docs/PLAN.md` 삭제.
+1. (선택) publish rate 수정.
+2. `docs/PLAN.md` 삭제.
 
 각 단계 후 `./run.sh` 로 회귀 확인.
 

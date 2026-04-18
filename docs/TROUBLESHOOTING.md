@@ -186,6 +186,17 @@ world = World(
 1. stiffness/damping 을 DriveAPI 에 주입해 Newton 을 `POSITION` 모드로 끌어올림. `sim_bridge/usd_patches.py::apply_drive_gains_to_joints()` 가 pre-reset 에 `robot.yaml.drive.{stiffness,damping}` 을 모든 PhysicsRevoluteJoint 에 기록. POSITION 경로의 JOINT_TARGET actuator 는 다른 코드 경로로 바인딩되므로 경고 없이 설치됨.
 2. 그래도 경고가 남으면 cosmetic — actuator 동작 여부는 `/joint_command` 로 실동작 확인으로 판정. 경고만 가지고 디버깅 들어가지 말 것 (memory: "MuJoCo unresolved-target warnings are cosmetic").
 
+### `[Error] [py stderr]` 스팸 (Newton per-prim / MuJoCo per-actuator)
+증상: 부팅 중 `[Error] [omni.kit.app._impl] [py stderr]: /isaac-sim/.../newton/.../*.py:...: UserWarning: ...` 류가 반복 출력. carb 는 stderr 를 Error 레벨로 태그함.
+
+해결: `launch_sim.py` 최상단 (SimulationApp 생성 **전**) 에 Python warnings 필터 4종을 설치. `warnings.filterwarnings("ignore", category=UserWarning, module=r"newton\._src\..*")` 등. Newton 의 zero-mass UserWarning 스팸과 MuJoCo 의 `unresolved target` 은 여기서 침묵.
+
+**한계**: 아래 2건은 Python `warnings` 를 우회하므로 필터가 못 잡음 — 각 1회성 startup 로그로 남음 (의도된 상태):
+- `[Warning] [pxr.Semantics] pxr.Semantics is deprecated` — `pxr/Semantics/__init__.py` 가 `omni.log.warn()` 으로 carb 채널에 직접 쏨.
+- `Warp DeprecationWarning: warp.context.Kernel will soon be removed` — `warp/_src/utils.py::warn()` 이 내부적으로 `warnings.catch_warnings()` + `simplefilter("default")` 로 사용자 필터를 리셋한 뒤 warn. 설계상 필터 우회.
+
+둘 다 1회성 cosmetic. 실제 동작에 영향 없음. 억지로 잡으려면 carb 채널 비활성화 / warp.warn monkey-patch 가 필요한데 스팸이 아니므로 두는 편.
+
 ### rclpy import 실패 (`ModuleNotFoundError: No module named 'rclpy'`)
 컨테이너 안에서 `launch_sim.py` 가 `import rclpy` 에서 죽는 경우. Isaac Sim 6.0.0-dev2 는 `isaacsim.ros2.bridge` 가 활성화될 때 번들 rclpy 를 sys.path 에 등록합니다. 증상이 나오면 다음을 순서대로 확인:
 
