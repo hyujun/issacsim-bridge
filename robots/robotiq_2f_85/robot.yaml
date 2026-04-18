@@ -1,0 +1,49 @@
+robot:
+  urdf_rel: urdf/robotiq_2f_85.urdf
+  usd_rel: usd/robotiq_2f_85/robotiq_2f_85.usda
+  prim_path: /World/Robot
+  joints_subpath: Physics
+  # URDF root link after the virtual `world` link. The world->base_joint fixed
+  # joint keeps body0 = robot root Xform (Newton treats as world anchor).
+  root_link: robotiq_85_base_link
+
+# Order: driver first, then mimic followers. Newton enforces
+# follower = coef0 + coef1 * driver as a hard solver constraint, so external
+# controllers only need to publish the driver joint on /joint_command — the
+# followers come along automatically.
+joint_names:
+  - robotiq_85_left_knuckle_joint        # driver,   revolute,   [0.0, 0.8]
+  - robotiq_85_right_knuckle_joint       # follower, revolute,   mul=-1
+  - robotiq_85_left_inner_knuckle_joint  # follower, continuous, mul=+1
+  - robotiq_85_right_inner_knuckle_joint # follower, continuous, mul=-1
+  - robotiq_85_left_finger_tip_joint     # follower, continuous, mul=-1
+  - robotiq_85_right_finger_tip_joint    # follower, continuous, mul=+1
+
+home_pose:
+  robotiq_85_left_knuckle_joint: 0.0
+  robotiq_85_right_knuckle_joint: 0.0
+  robotiq_85_left_inner_knuckle_joint: 0.0
+  robotiq_85_right_inner_knuckle_joint: 0.0
+  robotiq_85_left_finger_tip_joint: 0.0
+  robotiq_85_right_finger_tip_joint: 0.0
+
+# Gripper links are ~100x lighter than UR5e (mass 0.04-0.66 kg vs 2-8 kg),
+# so PD gains are scaled down to keep servo bandwidth comparable. The drive
+# is authored on the leader only; followers' position is driven by the
+# NewtonMimicAPI constraint (see apply_drive_gains_to_joints).
+drive:
+  mode: position
+  stiffness: 100.0
+  damping: 10.0
+
+sim:
+  mode: freerun
+  substeps: 4
+  render_rate_hz: 60
+  step_rate_hz: 500
+  sync_timeout_s: 0.5
+
+ros:
+  joint_states_topic: /joint_states
+  joint_command_topic: /joint_command
+  publish_rate_hz: 100

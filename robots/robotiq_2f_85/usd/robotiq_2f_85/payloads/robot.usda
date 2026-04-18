@@ -1,0 +1,164 @@
+#usda 1.0
+(
+    customLayerData = {
+        string creator = "URDF USD Converter v0.1.0"
+    }
+    defaultPrim = "robotiq_gripper"
+    doc = """Generated from Composed Stage of root layer /tmp/tmp0ieqjgvi/robotiq_gripper.usdc
+
+
+Generated from Composed Stage of root layer /workspace/robots/robotiq_2f_85/usd/usdex/robotiq_gripper.usdc
+
+
+Generated from Composed Stage of root layer /workspace/robots/robotiq_2f_85/usd/temp/robotiq_2f_85.usd
+
+
+Generated from Composed Stage of root layer /workspace/robots/robotiq_2f_85/usd/robotiq_2f_85/payloads/base.usd
+"""
+    kilogramsPerUnit = 1
+    metersPerUnit = 1
+    upAxis = "Z"
+)
+
+over "robotiq_gripper" (
+    prepend apiSchemas = ["IsaacRobotAPI", "IsaacLinkAPI"]
+)
+{
+    custom rel isaac:physics:robotJoints
+    prepend rel isaac:physics:robotJoints = [
+        </robotiq_gripper/Physics/robotiq_85_base_joint>,
+        </robotiq_gripper/Physics/robotiq_85_left_knuckle_joint>,
+        </robotiq_gripper/Physics/robotiq_85_right_knuckle_joint>,
+        </robotiq_gripper/Physics/robotiq_85_left_inner_knuckle_joint>,
+        </robotiq_gripper/Physics/robotiq_85_right_inner_knuckle_joint>,
+        </robotiq_gripper/Physics/robotiq_85_left_finger_tip_joint>,
+        </robotiq_gripper/Physics/robotiq_85_right_finger_tip_joint>,
+        </robotiq_gripper/Physics/robotiq_85_left_finger_joint>,
+        </robotiq_gripper/Physics/robotiq_85_right_finger_joint>,
+    ]
+    custom rel isaac:physics:robotLinks
+    prepend rel isaac:physics:robotLinks = [
+        </robotiq_gripper/Geometry/world/robotiq_85_base_link>,
+        </robotiq_gripper/Geometry/world/robotiq_85_base_link/robotiq_85_left_knuckle_link>,
+        </robotiq_gripper/Geometry/world/robotiq_85_base_link/robotiq_85_right_knuckle_link>,
+        </robotiq_gripper/Geometry/world/robotiq_85_base_link/robotiq_85_left_inner_knuckle_link>,
+        </robotiq_gripper/Geometry/world/robotiq_85_base_link/robotiq_85_right_inner_knuckle_link>,
+        </robotiq_gripper/Geometry/world/robotiq_85_base_link/robotiq_85_left_knuckle_link/robotiq_85_left_finger_link/robotiq_85_left_finger_tip_link>,
+        </robotiq_gripper/Geometry/world/robotiq_85_base_link/robotiq_85_right_knuckle_link/robotiq_85_right_finger_link/robotiq_85_right_finger_tip_link>,
+        </robotiq_gripper/Geometry/world/robotiq_85_base_link/robotiq_85_left_knuckle_link/robotiq_85_left_finger_link>,
+        </robotiq_gripper/Geometry/world/robotiq_85_base_link/robotiq_85_right_knuckle_link/robotiq_85_right_finger_link>,
+    ]
+
+    over "Physics"
+    {
+        over "robotiq_85_base_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "robotiq_85_left_knuckle_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "robotiq_85_right_knuckle_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "robotiq_85_left_inner_knuckle_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "robotiq_85_right_inner_knuckle_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "robotiq_85_left_finger_tip_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "robotiq_85_right_finger_tip_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "robotiq_85_left_finger_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+
+        over "robotiq_85_right_finger_joint" (
+            prepend apiSchemas = ["IsaacJointAPI"]
+        )
+        {
+        }
+    }
+
+    over "Geometry"
+    {
+        over "world"
+        {
+            over "robotiq_85_base_link" (
+                prepend apiSchemas = ["IsaacLinkAPI"]
+            )
+            {
+                over "robotiq_85_left_knuckle_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "robotiq_85_left_finger_link" (
+                        prepend apiSchemas = ["IsaacLinkAPI"]
+                    )
+                    {
+                        over "robotiq_85_left_finger_tip_link" (
+                            prepend apiSchemas = ["IsaacLinkAPI"]
+                        )
+                        {
+                        }
+                    }
+                }
+
+                over "robotiq_85_right_knuckle_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                    over "robotiq_85_right_finger_link" (
+                        prepend apiSchemas = ["IsaacLinkAPI"]
+                    )
+                    {
+                        over "robotiq_85_right_finger_tip_link" (
+                            prepend apiSchemas = ["IsaacLinkAPI"]
+                        )
+                        {
+                        }
+                    }
+                }
+
+                over "robotiq_85_left_inner_knuckle_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                }
+
+                over "robotiq_85_right_inner_knuckle_link" (
+                    prepend apiSchemas = ["IsaacLinkAPI"]
+                )
+                {
+                }
+            }
+        }
+    }
+}
+
