@@ -49,6 +49,33 @@ ArticulationView pattern 은 **`PhysicsArticulationRootAPI` (또는 `NewtonArtic
 
 USD attribute 사이드채널 (`UsdPhysics.JointStateAPI` / `DriveAPI.targetPosition` 에 직접 read/write 하는 방식) 은 **포기**했습니다. 이 번들의 `pxr.UsdPhysics` 에는 `JointStateAPI` 가 아예 없고 (PhysxSchema 로 이동), DriveAPI 경로는 URDFImporter 의 누락된 게인과 결합해 조용히 무동작으로 떨어집니다.
 
+## Mimic 조인트 경로
+
+URDF `<mimic>` 는 **bridge 코드가 전혀 관여하지 않는 경로**로 처리됩니다 — URDFImporter → USD schema → Newton solver constraint 까지 네이티브:
+
+```
+robot.urdf  <mimic joint="L" multiplier="k" offset="c"/>
+     │
+     ▼   URDFImporter (convert_urdf.py)
+follower joint prim
+   apiSchemas = ["NewtonMimicAPI"]        (plain physics variant)
+     OR
+   apiSchemas = ["PhysxMimicJointAPI:rotY"]  (physx variant; default)
+   newton:mimicCoef0 = c, newton:mimicCoef1 = k, newton:mimicJoint = </L>
+     │
+     ▼   Newton USD importer (launch_sim.py → world.reset())
+builder.add_constraint_mimic(follower, leader, coef0=c, coef1=k)
+     │
+     ▼   Newton solver
+hard constraint: q[follower] = c + k * q[leader]
+```
+
+외부 제어기는 leader 만 `/joint_command` 로 publish 하면 follower 가 자동으로 따라갑니다. `/joint_states` 는 `robot.yaml::joint_names` 에 나열된 모든 조인트의 현재 위치를 싣습니다 (driver + follower 전부).
+
+**중요 — drive 는 leader 에만**: `apply_drive_gains_to_joints()` 가 `NewtonMimicAPI` 또는 `PhysxMimicJointAPI:*` 를 가진 조인트를 skip 합니다. Follower 에 PD drive 가 걸리면 controller 가 건드리지 않은 stale target (0 초기값 등) 을 유지하려 해서 mimic 제약과 충돌 → 접촉 부하 하에서 drift. Robotiq 2F-85 (4-bar 폐쇄 링크) 로 검증: drift < 1e-5 rad = solver 수치 오차 수준.
+
+URDFImporter 는 follower 에 대해 **variant set 을 authoring**하므로 composed stage 에는 기본 `physx` variant 가 선택되어 PhysxMimicJointAPI 가 보입니다. Newton 의 USD importer 는 양쪽 variant 를 fallback 순서로 읽으므로 어느 쪽이 선택되어도 동일한 mimic constraint 가 설치됩니다.
+
 ## 왜 Newton 인가
 
 - GPU 기반 병렬 물리 (multi-env 학습 친화적)
