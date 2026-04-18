@@ -8,6 +8,17 @@ logic lives in the `sim_bridge/` package next to this file. Submodules are
 imported AFTER SimulationApp is up so they can freely import pxr / kit.
 """
 
+import warnings
+
+# Third-party UserWarning/DeprecationWarning that Newton and warp emit to
+# stderr end up tagged `[Error] [py stderr]` by carb's stderr capture. Filter
+# the known-noisy sources before SimulationApp boots Python's warning system.
+# Keep patterns narrow so sim_bridge/* warnings still surface.
+warnings.filterwarnings("ignore", category=UserWarning, module=r"newton\._src\..*")
+warnings.filterwarnings("ignore", category=UserWarning, module=r"warp\..*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"warp\..*")
+warnings.filterwarnings("ignore", category=DeprecationWarning, message=r".*pxr\.Semantics is deprecated.*")
+
 from isaacsim import SimulationApp
 
 CONFIG = {
