@@ -52,7 +52,6 @@ sim-bridge/
 │       ├── convert_urdf.py URDF → USD 변환 (pack 단위)
 │       ├── urdf/           ur_description 원본 URDF + mesh
 │       └── usd/            변환 결과 (convert 실행 후 생성)
-├── configs/                (예약) 향후 agnostic sim 설정
 └── docs/
     ├── ARCHITECTURE.md     시스템 설계 상세 + 레이어 분리
     ├── ROBOTS.md           pack 규약, 새 로봇 추가법

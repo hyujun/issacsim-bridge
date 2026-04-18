@@ -44,7 +44,6 @@ services:
       - ${HOME}/.Xauthority:/root/.Xauthority:rw
       - ../isaac_scripts:/workspace/scripts:rw
       - ../robots:/workspace/robots:rw
-      - ../configs:/workspace/configs:rw
       - isaac-cache-kit:/isaac-sim/kit/cache
       - isaac-cache-ov:/root/.cache/ov
       - isaac-cache-pip:/root/.cache/pip
