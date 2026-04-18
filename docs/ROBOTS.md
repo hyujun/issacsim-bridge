@@ -58,8 +58,10 @@ ros:
 
 1. `prim_path` 밑 어딘가에 `joint_names` 와 매칭되는 `PhysicsRevoluteJoint` prim 들이 존재한다. (정확한 하위 경로는 자유 — Newton ArticulationView 가 DOF 이름으로 매핑.)
 2. `prim_path` 계층 어딘가의 prim 이 `PhysicsArticulationRootAPI` 또는 `NewtonArticulationRootAPI` 를 가진다. 이름·위치는 자유 — `sim_bridge/robot.py::find_articulation_root_path()` 가 스키마로 스캔.
-3. URDFImporter 출력의 알려진 결함 두 가지는 `sim_bridge/usd_patches.py` 의 runtime patch 로 교정되므로 pack 에서 추가 작업 불필요:
+3. URDFImporter 출력의 알려진 결함 네 가지는 `sim_bridge/usd_patches.py` 의 runtime patch 로 교정되므로 pack 에서 추가 작업 불필요:
    - 모든 조인트의 `physics:body0` 이 robot root 로 고정된 star topology → `repair_joint_chain()` 이 `parent(body1)` 로 재작성.
+   - virtual 링크 (`base_link`, `ft_frame`, `flange`, `tool0`, `base` 류) 에 `PhysicsMassAPI` 가 mass/inertia 없이 붙어 Newton UserWarning 반복 → `strip_zero_mass_api()` 가 empty MassAPI 를 제거.
+   - `IsaacRobotAPI::isaac:physics:robotLinks` 가 star topology 기준으로 authoring 되어 후속 BFS 와 불일치 → `populate_robot_schema_links()` 가 repair 이후 `PopulateRobotSchemaFromArticulation` 재호출로 relationship 재작성.
    - `DriveAPI:angular` 가 `maxForce` 만 가짐 → `apply_drive_gains_to_joints()` 가 `robot.yaml` 의 stiffness/damping 주입.
 
 단위는 ROS 관례대로 **radian** — Newton 내부가 radian 이므로 `JointState` ↔ 내부 상태 간 변환 없이 바로 주고받음. 구 문서가 언급하던 degree 컨벤션은 USD 시절 이야기로, 현재 ArticulationView 경로에선 무관.

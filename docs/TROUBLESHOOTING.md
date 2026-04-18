@@ -163,6 +163,20 @@ world = World(
 
 해결: `sim_bridge/usd_patches.py::repair_joint_chain()` 가 pre-reset 에 각 joint 의 `body0` 를 `parent(body1)` 로 재작성. 예외는 `base_link` 를 world 에 고정하는 fixed joint 하나 — 얘는 body0=robot root 를 유지해야 함 (Newton 이 robot root 를 world 로 취급). 재작성 후 `articulation_label` 이 단일 엔트리 + `max_dofs=6` 이 나옵니다.
 
+### `Body .../base_link has zero mass and zero inertia despite having the MassAPI USD schema applied.`
+증상: 로그에 위 UserWarning 이 virtual 링크 (`base_link`, `ft_frame`, `flange`, `tool0`, `base`) 에 대해 5 회 반복.
+
+근본 원인: URDFImporter 는 URDF 의 `<inertial>` 블록이 없는 frame 링크에도 `PhysicsRigidBodyAPI + PhysicsMassAPI` 를 그대로 붙여버립니다. `physics:mass` / `physics:diagonalInertia` 가 authored 되지 않아 둘 다 0 인 상태. Newton 의 `_parse_mass` 경로가 "MassAPI 는 적용되어 있는데 값이 0" 을 감지하고 경고를 냅니다. 동작에는 영향 없음 (Newton 은 fallback 으로 기본 inertia 를 계산).
+
+해결: `sim_bridge/usd_patches.py::strip_zero_mass_api()` 가 `repair_joint_chain` 이후, `world.reset()` 이전에 mass/inertia 가 전혀 authored 되지 않은 prim 들로부터 MassAPI 를 제거. `prim.RemoveAPI(UsdPhysics.MassAPI)` — attribute 를 authoring 하지 않았으므로 안전하게 노출된 schema 만 벗겨냄.
+
+### `Robot at /World/Robot has links missing from schema relationship: [...]`
+증상: 로그에 위 warning 1 회. 기능 영향 없음.
+
+근본 원인: URDFImporter 가 `IsaacRobotAPI` 를 robot 루트에 적용하면서 `isaac:physics:robotLinks` 를 auto-populate 하는데, import 시점에는 joint chain 이 star topology (`body0 = /ur5e`) 라서 `_discover_articulation_prims` BFS 가 일부 링크만 도달. 런타임에 `isaacsim.robot.schema::GetAllRobotLinks` 가 BFS 결과 (repair 된 체인 기준) 와 relationship (stale) 을 비교해서 불일치를 warning 으로 찍음.
+
+해결: `sim_bridge/usd_patches.py::populate_robot_schema_links()` 가 `repair_joint_chain` 이후 `PopulateRobotSchemaFromArticulation` 을 다시 호출해 relationship 을 최신 체인 기준으로 재작성. 이 schema 는 Newton 의 물리 경로에서 소비되지 않음 — pure log-noise fix.
+
 ### `MuJoCo actuator N has unresolved target '/World/Robot/Physics/<joint>'. Skipping actuator.`
 증상: `solver_mujoco.py::_init_actuators` 에서 UserWarning 반복. stderr 로 나가 carb 가 Error 레벨로 찍음.
 

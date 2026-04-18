@@ -38,12 +38,19 @@ from sim_bridge.main_loop import run  # noqa: E402
 from sim_bridge.newton_view import setup_newton_articulation  # noqa: E402
 from sim_bridge.robot import assert_newton_backend, build_world, load_robot  # noqa: E402
 from sim_bridge.ros_bridge import setup_clock_publisher, setup_rclpy_bridge  # noqa: E402
-from sim_bridge.usd_patches import apply_drive_gains_to_joints, repair_joint_chain  # noqa: E402
+from sim_bridge.usd_patches import (  # noqa: E402
+    apply_drive_gains_to_joints,
+    populate_robot_schema_links,
+    repair_joint_chain,
+    strip_zero_mass_api,
+)
 
 carb.log_warn(f"[launch_sim] Loading robot pack: {ROBOT_PACK}")
 world = build_world()
 art_root = load_robot()
 repair_joint_chain(art_root)
+strip_zero_mass_api(art_root)
+populate_robot_schema_links(art_root)
 apply_drive_gains_to_joints(art_root)
 world.reset()  # creates physics scene + registers articulation before graph wiring
 setup_clock_publisher()

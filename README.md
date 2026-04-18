@@ -79,7 +79,7 @@ issacsim-bridge/
     - [x] `/joint_states` ~54 Hz publish, `/joint_command` 로 shoulder_pan 구동 검증
 - [~] Phase 5b — 런타임 cleanup (진행 중, 상세 [docs/PLAN.md](docs/PLAN.md))
     - [x] `sim_bridge/` 패키지 분리 (launch_sim.py 슬림)
-    - [ ] USD warning 정리 (zero-mass MassAPI strip, isaac:robot:links)
+    - [x] USD warning 정리 (zero-mass MassAPI strip, isaac:physics:robotLinks 재작성)
     - [ ] py-stderr UserWarning suppression
     - [ ] publish rate render-bound 해결 (선택)
 - [ ] Phase 6 — robot-agnostic 레이어 검증 + 두 번째 로봇 (hand) 투입
@@ -97,6 +97,8 @@ issacsim-bridge/
 - PhysX-tensor OmniGraph joint 노드 (`ROS2PublishJointState`, `IsaacArticulationController`) 는 Newton articulation 위에서 SEGV. 그래서 joint 경로는 rclpy sidechannel + Newton ArticulationView tensor API 사용.
 - URDFImporter 출력은 모든 조인트 `physics:body0 = </robot_root>` (star topology). Newton 이 체인을 잃음 → `sim_bridge/usd_patches.py::repair_joint_chain()` 가 body0 = parent(body1) 로 재작성.
 - URDFImporter 가 내뱉는 `DriveAPI:angular` 는 `maxForce` 만 가짐. stiffness/damping 이 없으면 Newton 이 EFFORT 모드로 내려가 움직이지 않음 → `apply_drive_gains_to_joints()` 가 yaml 게인 주입.
+- URDFImporter 가 virtual 링크에도 `PhysicsMassAPI` 를 붙여 mass=0/inertia=0 UserWarning 이 반복됨 → `strip_zero_mass_api()` 가 값이 authored 안 된 MassAPI 를 제거. 로그 노이즈 제거용.
+- URDFImporter 가 `IsaacRobotAPI::isaac:physics:robotLinks` 를 star topology 기준으로 authoring 해 후속 BFS 와 불일치 → `populate_robot_schema_links()` 가 `repair_joint_chain` 이후 `PopulateRobotSchemaFromArticulation` 재호출로 relationship 재작성.
 - Newton `create_articulation_view(pattern)` 의 pattern 은 **`ArticulationRootAPI` 가 붙은 prim 경로** (URDFImporter 출력 기준 `.../base_link`) — 레퍼런스 앵커 (`/World/Robot`) 가 아님.
 - Newton tensor frontend 는 GPU 파이프라인에서 **torch/warp 만** 허용. `create_simulation_view("numpy", ...)` 금지.
 - `UsdPhysics.JointStateAPI` 는 이 번들에 없음 — `PhysxSchema.JointStateAPI` 로 옮겨감. Newton ArticulationView 경로를 쓰면 USD attribute 접근 자체를 피할 수 있음.
