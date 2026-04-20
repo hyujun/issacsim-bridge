@@ -5,6 +5,7 @@ import isaacsim.physics.newton as newton_ext
 from isaacsim.physics.newton import tensors as newton_tensors
 
 from sim_bridge.config import ROBOT_CFG
+from sim_bridge.dof_map import build_dof_index_map
 from sim_bridge.robot import find_articulation_root_path
 
 
@@ -57,18 +58,7 @@ def setup_newton_articulation(prim_path: str) -> tuple:
     )
     dof_names = list(dof_names_nested[0]) if dof_names_nested else []
 
-    index_map: dict[str, int] = {}
-    for yaml_name in ROBOT_CFG["joint_names"]:
-        found = None
-        for i, n in enumerate(dof_names):
-            if n == yaml_name or n.rsplit("/", 1)[-1] == yaml_name:
-                found = i
-                break
-        if found is None:
-            raise RuntimeError(
-                f"DOF '{yaml_name}' not found in Newton articulation. Available DOFs: {dof_names}"
-            )
-        index_map[yaml_name] = found
+    index_map = build_dof_index_map(list(ROBOT_CFG["joint_names"]), dof_names)
 
     carb.log_warn(
         f"[launch_sim] Newton articulation ready: count={art.count} "

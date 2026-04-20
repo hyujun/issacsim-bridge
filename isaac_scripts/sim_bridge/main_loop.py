@@ -38,12 +38,19 @@ def run(
     ros_node,
     js_pub,
     latest_cmd: dict,
+    max_run_seconds: float = 0.0,
 ) -> None:
+    """Orchestrate the sim loop.
+
+    max_run_seconds: if > 0, auto-close after that many wall-clock seconds.
+    Used by the Phase 1.2 smoke-test harness (SIM_MAX_RUN_SECONDS env).
+    """
     timeline = omni.timeline.get_timeline_interface()
     joint_names = list(ROBOT_CFG["joint_names"])
     _device = torch.device("cuda:0")
     indices0 = torch.tensor([0], dtype=torch.int32, device=_device)
     target_buffer = torch.zeros((1, articulation.max_dofs), dtype=torch.float32, device=_device)
+    deadline = (time.monotonic() + max_run_seconds) if max_run_seconds > 0 else float("inf")
 
     def apply_cmd() -> None:
         cmd_positions = latest_cmd["positions"]
@@ -68,16 +75,16 @@ def run(
 
     try:
         if SIM_CFG["mode"] == "sync":
-            _run_sync(simulation_app, world, ros_node, latest_cmd, apply_cmd, publish_state)
+            _run_sync(simulation_app, world, ros_node, latest_cmd, apply_cmd, publish_state, deadline)
         else:
-            _run_freerun(simulation_app, world, ros_node, apply_cmd, publish_state)
+            _run_freerun(simulation_app, world, ros_node, apply_cmd, publish_state, deadline)
     finally:
         ros_node.destroy_node()
         rclpy.shutdown()
         simulation_app.close()
 
 
-def _run_freerun(simulation_app, world, ros_node, apply_cmd, publish_state) -> None:
+def _run_freerun(simulation_app, world, ros_node, apply_cmd, publish_state, deadline: float) -> None:
     pub_interval = 1.0 / float(ROBOT_CFG["ros"]["publish_rate_hz"])
     next_pub_time = 0.0
     while simulation_app.is_running():
@@ -88,9 +95,11 @@ def _run_freerun(simulation_app, world, ros_node, apply_cmd, publish_state) -> N
         if now >= next_pub_time:
             publish_state()
             next_pub_time = now + pub_interval
+        if now >= deadline:
+            return
 
 
-def _run_sync(simulation_app, world, ros_node, latest_cmd, apply_cmd, publish_state) -> None:
+def _run_sync(simulation_app, world, ros_node, latest_cmd, apply_cmd, publish_state, deadline: float) -> None:
     import carb
 
     render_dt = 1.0 / float(SIM_CFG["render_rate_hz"])
@@ -135,3 +144,5 @@ def _run_sync(simulation_app, world, ros_node, latest_cmd, apply_cmd, publish_st
         world.step(render=False)
         publish_state()
         maybe_render()
+        if time.monotonic() >= deadline:
+            return

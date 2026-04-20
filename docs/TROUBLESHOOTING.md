@@ -163,28 +163,20 @@ world = World(
 
 해결: `sim_bridge/usd_patches.py::repair_joint_chain()` 가 pre-reset 에 각 joint 의 `body0` 를 `parent(body1)` 로 재작성. 예외는 `base_link` 를 world 에 고정하는 fixed joint 하나 — 얘는 body0=robot root 를 유지해야 함 (Newton 이 robot root 를 world 로 취급). 재작성 후 `articulation_label` 이 단일 엔트리 + `max_dofs=6` 이 나옵니다.
 
-### `Body .../base_link has zero mass and zero inertia despite having the MassAPI USD schema applied.`
-증상: 로그에 위 UserWarning 이 virtual 링크 (`base_link`, `ft_frame`, `flange`, `tool0`, `base`) 에 대해 5 회 반복.
+### ~~`Body .../base_link has zero mass and zero inertia despite having the MassAPI USD schema applied.`~~ (obsolete)
+**Phase 1.2 검증 (2026-04-20)으로 URDFImporter 3.2.1 에서 더 이상 발생하지 않음 확인**. `strip_zero_mass_api` 패치는 `sim_bridge/usd_patches.py` 에서 제거됨. 과거에는 URDFImporter 가 `<inertial>` 블록 없는 frame 링크에도 `PhysicsMassAPI` 를 붙여 Newton 이 mass=0 경고를 5 회 반복했으나, 현재 이미지 (6.0.0-dev2 / URDFImporter 3.2.1) 는 근본 원인을 해결함. 옛 버전으로 되돌린다면 해당 패치를 다시 복원해야 함 — `git log` 에서 `strip_zero_mass_api` 로 찾으면 구현 참고 가능.
 
-근본 원인: URDFImporter 는 URDF 의 `<inertial>` 블록이 없는 frame 링크에도 `PhysicsRigidBodyAPI + PhysicsMassAPI` 를 그대로 붙여버립니다. `physics:mass` / `physics:diagonalInertia` 가 authored 되지 않아 둘 다 0 인 상태. Newton 의 `_parse_mass` 경로가 "MassAPI 는 적용되어 있는데 값이 0" 을 감지하고 경고를 냅니다. 동작에는 영향 없음 (Newton 은 fallback 으로 기본 inertia 를 계산).
+### `Robot at /World/Robot has links missing from schema relationship: [...]` (cosmetic, 현재 억제 불가)
+증상: 로그에 위 warning 1 회. 기능 영향 없음. URDFImporter 가 `IsaacRobotAPI::isaac:physics:robotLinks` 관계를 자동 populate 하지만 BFS 결과가 런타임 체인과 불일치하는 경우 발생.
 
-해결: `sim_bridge/usd_patches.py::strip_zero_mass_api()` 가 `repair_joint_chain` 이후, `world.reset()` 이전에 mass/inertia 가 전혀 authored 되지 않은 prim 들로부터 MassAPI 를 제거. `prim.RemoveAPI(UsdPhysics.MassAPI)` — attribute 를 authoring 하지 않았으므로 안전하게 노출된 schema 만 벗겨냄.
+**Phase 1.2 검증 결과**: 과거에 있던 `populate_robot_schema_links` 패치는 **무효했음** — 패치 on/off 양쪽 모두 동일한 경고 1 회 발생. 현재 코드에서는 제거됨. 이 schema 는 Newton 물리 경로에서 소비되지 않으므로 warning 은 무시해도 안전함. 향후 Isaac Sim 업데이트로 URDFImporter 가 이를 정상 populate 하면 자연 해소될 예정.
 
-### `Robot at /World/Robot has links missing from schema relationship: [...]`
-증상: 로그에 위 warning 1 회. 기능 영향 없음.
+### Drive gain 누락 → OmniGraph 코어 segfault (6.0.0-dev2 에서 격상된 증상)
+증상: `apply_drive_gains_to_joints` 없이 기동하면 `ROS2ClockGraph` 노드 생성 단계에서 Fatal 크래시 → `Segmentation fault (core dumped)`. Phase 1.2 smoke test (2026-04-20) 로 재현 확정.
 
-근본 원인: URDFImporter 가 `IsaacRobotAPI` 를 robot 루트에 적용하면서 `isaac:physics:robotLinks` 를 auto-populate 하는데, import 시점에는 joint chain 이 star topology (`body0 = /ur5e`) 라서 `_discover_articulation_prims` BFS 가 일부 링크만 도달. 런타임에 `isaacsim.robot.schema::GetAllRobotLinks` 가 BFS 결과 (repair 된 체인 기준) 와 relationship (stale) 을 비교해서 불일치를 warning 으로 찍음.
+근본 원인: DriveAPI 에 stiffness/damping 이 없으면 Newton 은 `JointTargetMode.EFFORT` 로 떨어짐. 과거에는 `solver_mujoco.py::_init_actuators` 가 `MuJoCo actuator has unresolved target` warning 만 찍고 skip 했으나, 6.0.0-dev2 에서는 OmniGraph hash 테이블 rehash 중 libomni.graph.core.plugin.so 가 세그폴트. stack trace 는 대체로 `_Hashtable::_M_rehash` + ROS2ClockGraph 노드 생성 커맨드.
 
-해결: `sim_bridge/usd_patches.py::populate_robot_schema_links()` 가 `repair_joint_chain` 이후 `PopulateRobotSchemaFromArticulation` 을 다시 호출해 relationship 을 최신 체인 기준으로 재작성. 이 schema 는 Newton 의 물리 경로에서 소비되지 않음 — pure log-noise fix.
-
-### `MuJoCo actuator N has unresolved target '/World/Robot/Physics/<joint>'. Skipping actuator.`
-증상: `solver_mujoco.py::_init_actuators` 에서 UserWarning 반복. stderr 로 나가 carb 가 Error 레벨로 찍음.
-
-근본 원인: DriveAPI 에 stiffness/damping 이 없으면 Newton 은 `JointTargetMode.EFFORT` 로 떨어져 CTRL_DIRECT motor actuator 를 설치하려 시도하고, 그 target 이 solver 내부 이름 해상도에 실패해 경고만 찍고 skip. 실제 actuator 가 없으니 조인트가 움직이지 않음.
-
-해결 두 가지:
-1. stiffness/damping 을 DriveAPI 에 주입해 Newton 을 `POSITION` 모드로 끌어올림. `sim_bridge/usd_patches.py::apply_drive_gains_to_joints()` 가 pre-reset 에 `robot.yaml.drive.{stiffness,damping}` 을 모든 PhysicsRevoluteJoint 에 기록. POSITION 경로의 JOINT_TARGET actuator 는 다른 코드 경로로 바인딩되므로 경고 없이 설치됨.
-2. 그래도 경고가 남으면 cosmetic — actuator 동작 여부는 `/joint_command` 로 실동작 확인으로 판정. 경고만 가지고 디버깅 들어가지 말 것 (memory: "MuJoCo unresolved-target warnings are cosmetic").
+해결: `sim_bridge/usd_patches.py::apply_drive_gains_to_joints()` 가 pre-reset 에 `robot.yaml.drive.{stiffness,damping}` 을 모든 `PhysicsRevoluteJoint` 에 기록. Mimic follower (`NewtonMimicAPI` / `PhysxMimicJointAPI:*`) 는 skip — solver constraint 와 충돌. 이 패치는 **필수** — cosmetic 이었던 warning 이 현재는 하드 크래시 유발. Phase 1.2 검증으로 SIM_SKIP_PATCHES=apply_drive_gains 설정 시 즉시 재현됨.
 
 ### `[Error] [py stderr]` 스팸 (Newton per-prim / MuJoCo per-actuator)
 증상: 부팅 중 `[Error] [omni.kit.app._impl] [py stderr]: /isaac-sim/.../newton/.../*.py:...: UserWarning: ...` 류가 반복 출력. carb 는 stderr 를 Error 레벨로 태그함.

@@ -96,9 +96,8 @@ issacsim-bridge/
 - `World()` backend 를 명시 (`torch`, `cuda:0`) 안 하면 `world.reset` 에서 numpy↔torch mismatch 로 `.detach()` 터짐.
 - PhysX-tensor OmniGraph joint 노드 (`ROS2PublishJointState`, `IsaacArticulationController`) 는 Newton articulation 위에서 SEGV. 그래서 joint 경로는 rclpy sidechannel + Newton ArticulationView tensor API 사용.
 - URDFImporter 출력은 모든 조인트 `physics:body0 = </robot_root>` (star topology). Newton 이 체인을 잃음 → `sim_bridge/usd_patches.py::repair_joint_chain()` 가 body0 = parent(body1) 로 재작성.
-- URDFImporter 가 내뱉는 `DriveAPI:angular` 는 `maxForce` 만 가짐. stiffness/damping 이 없으면 Newton 이 EFFORT 모드로 내려가 움직이지 않음 → `apply_drive_gains_to_joints()` 가 yaml 게인 주입.
-- URDFImporter 가 virtual 링크에도 `PhysicsMassAPI` 를 붙여 mass=0/inertia=0 UserWarning 이 반복됨 → `strip_zero_mass_api()` 가 값이 authored 안 된 MassAPI 를 제거. 로그 노이즈 제거용.
-- URDFImporter 가 `IsaacRobotAPI::isaac:physics:robotLinks` 를 star topology 기준으로 authoring 해 후속 BFS 와 불일치 → `populate_robot_schema_links()` 가 `repair_joint_chain` 이후 `PopulateRobotSchemaFromArticulation` 재호출로 relationship 재작성.
+- URDFImporter 가 내뱉는 `DriveAPI:angular` 는 `maxForce` 만 가짐. stiffness/damping 이 없으면 Newton 이 EFFORT 모드로 내려가 6.0.0-dev2 에서는 OmniGraph 코어 세그폴트 → `apply_drive_gains_to_joints()` 가 yaml 게인 주입. (Phase 1.2 검증)
+- (과거 URDFImporter 의 빈 `PhysicsMassAPI` / stale `isaac:physics:robotLinks` 결함 2 가지는 2026-04-20 Phase 1.2 검증으로 제거 — URDFImporter 3.2.1 에서 해결되었거나 패치가 무효했음. 상세: `docs/MIGRATION_PLAN.md`.)
 - Newton `create_articulation_view(pattern)` 의 pattern 은 **`ArticulationRootAPI` 가 붙은 prim 경로** (URDFImporter 출력 기준 `.../base_link`) — 레퍼런스 앵커 (`/World/Robot`) 가 아님.
 - Newton tensor frontend 는 GPU 파이프라인에서 **torch/warp 만** 허용. `create_simulation_view("numpy", ...)` 금지.
 - `UsdPhysics.JointStateAPI` 는 이 번들에 없음 — `PhysxSchema.JointStateAPI` 로 옮겨감. Newton ArticulationView 경로를 쓰면 USD attribute 접근 자체를 피할 수 있음.

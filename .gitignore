@@ -18,3 +18,7 @@ shader_cache/
 .vscode/
 .idea/
 .DS_Store
+
+# Claude Code runtime
+.claude/
+.pytest_cache/

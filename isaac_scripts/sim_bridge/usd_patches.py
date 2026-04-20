@@ -2,6 +2,21 @@
 
 Applied after add_reference_to_stage and before world.reset(), so Newton sees
 a corrected stage when it parses articulations.
+
+Historical note: four patches were originally needed. Phase 1.2 validation
+against URDFImporter 3.2.1 (2026-04-20) confirmed only two are still active:
+
+  - `repair_joint_chain`    — functional; skip = max_dofs=0, star topology
+  - `apply_drive_gains`     — functional; skip = OmniGraph core segfault
+
+The other two were removed:
+  - `strip_zero_mass_api`            — URDFImporter 3.2.1 no longer emits
+    `PhysicsMassAPI` on virtual frame links, so there is nothing to strip.
+  - `populate_robot_schema_links`    — the `isaac:physics:robotLinks`
+    relationship warning (`Robot at ... has links missing from schema
+    relationship`) now fires regardless of whether we re-populate, so the
+    patch was ineffective. The warning is cosmetic (Newton physics does not
+    consume the schema), so removing the patch loses nothing.
 """
 
 import carb
@@ -65,75 +80,6 @@ def repair_joint_chain(prim_path: str, articulation_root_name: str) -> int:
         f"kept {skipped_world_anchor} world-anchor joint(s)"
     )
     return fixed
-
-
-def strip_zero_mass_api(prim_path: str) -> int:
-    """Remove PhysicsMassAPI from virtual links with neither mass nor inertia.
-
-    URDFImporter (Isaac Sim 6.0.0-dev2) applies `PhysicsMassAPI` to every link,
-    including URDF virtual/frame links (`base_link`, `ft_frame`, `flange`,
-    `tool0`, `base`) that have no `<inertial>` block. Those prims end up with
-    mass=0 and diagonalInertia=(0,0,0) but still carry MassAPI, which triggers
-    Newton's `Body ... has zero mass and zero inertia despite having the MassAPI
-    USD schema applied` UserWarning once per prim at import time.
-
-    Newton falls back to defaults for uninstrumented prims, so removing the
-    empty MassAPI is semantically a no-op — it just silences the warning.
-    """
-    stage: Usd.Stage = get_current_stage()
-    root = stage.GetPrimAtPath(prim_path)
-    if not root.IsValid():
-        raise RuntimeError(f"Robot prim not found: {prim_path}")
-
-    removed = 0
-    for prim in Usd.PrimRange(root):
-        if not prim.HasAPI(UsdPhysics.MassAPI):
-            continue
-        mass_attr = prim.GetAttribute("physics:mass")
-        inertia_attr = prim.GetAttribute("physics:diagonalInertia")
-        mass_val = mass_attr.Get() if mass_attr and mass_attr.HasAuthoredValue() else 0.0
-        inertia_val = inertia_attr.Get() if inertia_attr and inertia_attr.HasAuthoredValue() else (0.0, 0.0, 0.0)
-        if float(mass_val or 0.0) > 0.0:
-            continue
-        if any(float(c) > 0.0 for c in (inertia_val or (0.0, 0.0, 0.0))):
-            continue
-        prim.RemoveAPI(UsdPhysics.MassAPI)
-        removed += 1
-
-    carb.log_warn(f"[launch_sim] Stripped empty PhysicsMassAPI from {removed} prim(s)")
-    return removed
-
-
-def populate_robot_schema_links(prim_path: str) -> int:
-    """Rebuild `isaac:physics:robotLinks` + IsaacLinkAPI on the robot prim.
-
-    URDFImporter authors `IsaacRobotAPI` on the robot root with a stale
-    `isaac:physics:robotLinks` relationship — stale because `ApplyRobotAPI`
-    runs at import time when joints still carry the star topology, so the
-    BFS only reaches a subset of links. `isaacsim.robot.schema` then emits
-    `Robot at ... has links missing from schema relationship` at runtime.
-
-    Re-runs `PopulateRobotSchemaFromArticulation` AFTER `repair_joint_chain`
-    so the BFS walks the full kinematic chain and the relationship matches
-    `_discover_articulation_prims`'s view of the articulation. Purely a
-    log-noise fix — nothing in Newton's simulation path consumes this schema.
-    """
-    stage: Usd.Stage = get_current_stage()
-    root = stage.GetPrimAtPath(prim_path)
-    if not root.IsValid():
-        raise RuntimeError(f"Robot prim not found: {prim_path}")
-
-    from usd.schema.isaac.robot_schema import utils as robot_schema_utils
-
-    root_link, _ = robot_schema_utils.PopulateRobotSchemaFromArticulation(stage, root, root)
-    rel = root.GetRelationship("isaac:physics:robotLinks")
-    count = len(rel.GetTargets()) if rel else 0
-    carb.log_warn(
-        f"[launch_sim] Repopulated robot schema links: "
-        f"root={root_link.GetPath() if root_link else '?'}, "
-        f"robotLinks targets={count}"
-    )
-    return count
 
 
 def apply_drive_gains_to_joints(prim_path: str) -> int:
