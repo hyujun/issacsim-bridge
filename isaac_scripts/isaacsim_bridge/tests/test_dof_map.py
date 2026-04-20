@@ -1,8 +1,8 @@
-"""Host-runnable unit tests for sim_bridge.dof_map."""
+"""Host-runnable unit tests for isaacsim_bridge.dof_map."""
 
 import pytest
 
-from sim_bridge.dof_map import build_dof_index_map
+from isaacsim_bridge.dof_map import build_dof_index_map
 
 
 def test_exact_name_match():

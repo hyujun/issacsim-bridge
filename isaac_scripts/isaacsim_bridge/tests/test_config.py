@@ -1,4 +1,4 @@
-"""Host-runnable unit tests for sim_bridge.config.
+"""Host-runnable unit tests for isaacsim_bridge.config.
 
 No Isaac Sim deps — only stdlib + yaml. Exercises pure functions with
 in-memory yaml fixtures and on-disk tmp_path packs so tests don't depend
@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from sim_bridge import config
+from isaacsim_bridge import config
 
 
 # ---- load_robot_config ----

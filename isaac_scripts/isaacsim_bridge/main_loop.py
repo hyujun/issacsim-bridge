@@ -21,7 +21,7 @@ import rclpy
 import torch
 from sensor_msgs.msg import JointState
 
-from sim_bridge.config import ROBOT_CFG, SIM_CFG
+from isaacsim_bridge.config import ROBOT_CFG, SIM_CFG
 
 
 def _sim_time_stamp(timeline, stamp) -> None:

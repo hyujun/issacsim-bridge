@@ -137,7 +137,7 @@ world = World(
 
 근본 원인: 이 3개 노드는 PhysX-tensor C++ 런타임이 articulation 을 tensor view 로 잡아야 동작합니다. 6.0.0-dev2 의 `URDFImporter` 는 Newton 쪽 schema (`NewtonArticulationRootAPI`) 와 PhysX 쪽 schema 가 섞인 출력을 내놓는데, Newton backend 아래에서는 PhysX-tensor 가 이 articulation 을 인식하지 못하고 null 포인터를 탑니다. **Python `isaacsim.core.api.articulations.Articulation` 래퍼도 동일 경로를 타므로 같은 위험이 있습니다.**
 
-해결: joint bridge 를 OmniGraph 가 아니라 **rclpy sidechannel** 로 구현. Newton 의 tensor **ArticulationView** (`sim_bridge/newton_view.py` 에서 `create_simulation_view("torch", ...)` → `create_articulation_view(<ArticulationRootAPI prim path>)` 로 생성) 의 `get_dof_positions(copy=True)` 로 상태를 읽고 `set_dof_position_targets(buffer, indices0)` 로 명령을 기록. 단위는 radian — Newton 내부가 radian 이므로 ROS 와 변환 불필요. 향후 PhysX-tensor 가 Newton articulation 을 안전히 감싸게 되면 OmniGraph 경로로 되돌릴 수 있음.
+해결: joint bridge 를 OmniGraph 가 아니라 **rclpy sidechannel** 로 구현. Newton 의 tensor **ArticulationView** (`isaacsim_bridge/newton_view.py` 에서 `create_simulation_view("torch", ...)` → `create_articulation_view(<ArticulationRootAPI prim path>)` 로 생성) 의 `get_dof_positions(copy=True)` 로 상태를 읽고 `set_dof_position_targets(buffer, indices0)` 로 명령을 기록. 단위는 radian — Newton 내부가 radian 이므로 ROS 와 변환 불필요. 향후 PhysX-tensor 가 Newton articulation 을 안전히 감싸게 되면 OmniGraph 경로로 되돌릴 수 있음.
 
 ### `AttributeError: module 'pxr.UsdPhysics' has no attribute 'JointStateAPI'`
 증상: joint 상태를 USD attribute 사이드채널로 읽으려 `UsdPhysics.JointStateAPI.Get(prim, "angular")` 호출 시 터짐.
@@ -147,24 +147,24 @@ world = World(
 ### `The Numpy frontend cannot be used with GPU pipelines`
 증상: `newton_tensors.create_simulation_view("numpy", newton_stage)` 호출 시 Exception.
 
-근본 원인: `World(device="cuda:0")` 로 GPU 파이프라인을 쓰면 Newton tensor frontend 도 GPU-호환이어야 합니다. `numpy` 프런트엔드는 CPU 전용. 해결: `create_simulation_view("torch", newton_stage)` (`sim_bridge/newton_view.py` 에서 채택) 또는 `"warp"`.
+근본 원인: `World(device="cuda:0")` 로 GPU 파이프라인을 쓰면 Newton tensor frontend 도 GPU-호환이어야 합니다. `numpy` 프런트엔드는 CPU 전용. 해결: `create_simulation_view("torch", newton_stage)` (`isaacsim_bridge/newton_view.py` 에서 채택) 또는 `"warp"`.
 
 ### `Newton ArticulationView matched no articulations for pattern '/World/Robot'`
 증상: `sim_view.create_articulation_view("/World/Robot")` 이 `count=0` 반환 → 이후 `set_dof_position_targets` 가 무동작.
 
 근본 원인: Newton 의 `articulation_label` 은 `PhysicsArticulationRootAPI` / `NewtonArticulationRootAPI` 가 **붙은 prim 의 전체 경로** 로 매칭합니다. URDFImporter 출력은 ArticulationRootAPI 를 레퍼런스 앵커 (`/World/Robot`) 가 아니라 kinematic base link (`/World/Robot/Geometry/world/base_link`) 에 붙입니다. pattern 으로 앵커를 주면 매칭 실패.
 
-해결: `sim_bridge/robot.py::find_articulation_root_path()` 가 robot prim 하위를 순회해 스키마가 적용된 prim 경로를 자동 반환. 그걸 `create_articulation_view()` 에 넘기면 정상 매칭됨. robot pack 에 따라 base link 이름이 달라져도 스키마 기준이라 그대로 작동.
+해결: `isaacsim_bridge/robot.py::find_articulation_root_path()` 가 robot prim 하위를 순회해 스키마가 적용된 prim 경로를 자동 반환. 그걸 `create_articulation_view()` 에 넘기면 정상 매칭됨. robot pack 에 따라 base link 이름이 달라져도 스키마 기준이라 그대로 작동.
 
 ### `Newton model articulations: [...]` 에 여러 엔트리 / `max_dofs=0`
 증상: `newton_stage.model.articulation_label` 출력이 링크별로 쪼개져 나열되고 ArticulationView 의 `max_dofs=0`. 로봇이 가만히 있음.
 
 근본 원인: URDFImporter 6.0.0-dev2 가 **모든 조인트의 `physics:body0` 를 robot root (`</robot_name>`) 로** 설정 — star topology. robot root 는 `RigidBodyAPI` 가 없어 Newton 이 유효한 부모로 인식 못 하고, 각 링크를 독립 articulation 으로 파싱. 결과적으로 각 "articulation" 에 DOF 가 하나도 없음.
 
-해결: `sim_bridge/usd_patches.py::repair_joint_chain()` 가 pre-reset 에 각 joint 의 `body0` 를 `parent(body1)` 로 재작성. 예외는 `base_link` 를 world 에 고정하는 fixed joint 하나 — 얘는 body0=robot root 를 유지해야 함 (Newton 이 robot root 를 world 로 취급). 재작성 후 `articulation_label` 이 단일 엔트리 + `max_dofs=6` 이 나옵니다.
+해결: `isaacsim_bridge/usd_patches.py::repair_joint_chain()` 가 pre-reset 에 각 joint 의 `body0` 를 `parent(body1)` 로 재작성. 예외는 `base_link` 를 world 에 고정하는 fixed joint 하나 — 얘는 body0=robot root 를 유지해야 함 (Newton 이 robot root 를 world 로 취급). 재작성 후 `articulation_label` 이 단일 엔트리 + `max_dofs=6` 이 나옵니다.
 
 ### ~~`Body .../base_link has zero mass and zero inertia despite having the MassAPI USD schema applied.`~~ (obsolete)
-**Phase 1.2 검증 (2026-04-20)으로 URDFImporter 3.2.1 에서 더 이상 발생하지 않음 확인**. `strip_zero_mass_api` 패치는 `sim_bridge/usd_patches.py` 에서 제거됨. 과거에는 URDFImporter 가 `<inertial>` 블록 없는 frame 링크에도 `PhysicsMassAPI` 를 붙여 Newton 이 mass=0 경고를 5 회 반복했으나, 현재 이미지 (6.0.0-dev2 / URDFImporter 3.2.1) 는 근본 원인을 해결함. 옛 버전으로 되돌린다면 해당 패치를 다시 복원해야 함 — `git log` 에서 `strip_zero_mass_api` 로 찾으면 구현 참고 가능.
+**Phase 1.2 검증 (2026-04-20)으로 URDFImporter 3.2.1 에서 더 이상 발생하지 않음 확인**. `strip_zero_mass_api` 패치는 `isaacsim_bridge/usd_patches.py` 에서 제거됨. 과거에는 URDFImporter 가 `<inertial>` 블록 없는 frame 링크에도 `PhysicsMassAPI` 를 붙여 Newton 이 mass=0 경고를 5 회 반복했으나, 현재 이미지 (6.0.0-dev2 / URDFImporter 3.2.1) 는 근본 원인을 해결함. 옛 버전으로 되돌린다면 해당 패치를 다시 복원해야 함 — `git log` 에서 `strip_zero_mass_api` 로 찾으면 구현 참고 가능.
 
 ### `Robot at /World/Robot has links missing from schema relationship: [...]` (cosmetic, 현재 억제 불가)
 증상: 로그에 위 warning 1 회. 기능 영향 없음. URDFImporter 가 `IsaacRobotAPI::isaac:physics:robotLinks` 관계를 자동 populate 하지만 BFS 결과가 런타임 체인과 불일치하는 경우 발생.
@@ -176,7 +176,7 @@ world = World(
 
 근본 원인: DriveAPI 에 stiffness/damping 이 없으면 Newton 은 `JointTargetMode.EFFORT` 로 떨어짐. 과거에는 `solver_mujoco.py::_init_actuators` 가 `MuJoCo actuator has unresolved target` warning 만 찍고 skip 했으나, 6.0.0-dev2 에서는 OmniGraph hash 테이블 rehash 중 libomni.graph.core.plugin.so 가 세그폴트. stack trace 는 대체로 `_Hashtable::_M_rehash` + ROS2ClockGraph 노드 생성 커맨드.
 
-해결: `sim_bridge/usd_patches.py::apply_drive_gains_to_joints()` 가 pre-reset 에 `robot.yaml.drive.{stiffness,damping}` 을 모든 `PhysicsRevoluteJoint` 에 기록. Mimic follower (`NewtonMimicAPI` / `PhysxMimicJointAPI:*`) 는 skip — solver constraint 와 충돌. 이 패치는 **필수** — cosmetic 이었던 warning 이 현재는 하드 크래시 유발. Phase 1.2 검증으로 SIM_SKIP_PATCHES=apply_drive_gains 설정 시 즉시 재현됨.
+해결: `isaacsim_bridge/usd_patches.py::apply_drive_gains_to_joints()` 가 pre-reset 에 `robot.yaml.drive.{stiffness,damping}` 을 모든 `PhysicsRevoluteJoint` 에 기록. Mimic follower (`NewtonMimicAPI` / `PhysxMimicJointAPI:*`) 는 skip — solver constraint 와 충돌. 이 패치는 **필수** — cosmetic 이었던 warning 이 현재는 하드 크래시 유발. Phase 1.2 검증으로 SIM_SKIP_PATCHES=apply_drive_gains 설정 시 즉시 재현됨.
 
 ### `[Error] [py stderr]` 스팸 (Newton per-prim / MuJoCo per-actuator)
 증상: 부팅 중 `[Error] [omni.kit.app._impl] [py stderr]: /isaac-sim/.../newton/.../*.py:...: UserWarning: ...` 류가 반복 출력. carb 는 stderr 를 Error 레벨로 태그함.
@@ -252,7 +252,7 @@ ros2 topic echo /joint_command
 ```
 
 ### sync 모드에서 GUI 가 얼어붙음
-`maybe_render()` 가 호출 안 되는 경우. 현재 코드에선 wait loop 와 active step 양쪽에서 `simulation_app.update()` 를 60 Hz (기본) wall-clock 케이던스로 펌핑함. 직접 수정한 버전에서 freeze 하면 `sim_bridge/main_loop.py::_run_sync` 의 `maybe_render()` 호출 누락 여부 점검. `render_rate_hz` 를 낮추면 GUI 프레임도 낮아지지만 freeze 는 아니어야 함.
+`maybe_render()` 가 호출 안 되는 경우. 현재 코드에선 wait loop 와 active step 양쪽에서 `simulation_app.update()` 를 60 Hz (기본) wall-clock 케이던스로 펌핑함. 직접 수정한 버전에서 freeze 하면 `isaacsim_bridge/main_loop.py::_run_sync` 의 `maybe_render()` 호출 누락 여부 점검. `render_rate_hz` 를 낮추면 GUI 프레임도 낮아지지만 freeze 는 아니어야 함.
 
 ### sync 모드에서 제어기가 state 보고 시간 불일치 (`use_sim_time:=true` 기준)
 sync 모드는 `header.stamp` 를 `omni.timeline.get_current_time()` (sim-time) 으로 채움. `/clock` 도 sim-time 기준이므로 `use_sim_time:=true` 구독자는 stamp 와 clock 이 일치해야 함. 불일치하면:

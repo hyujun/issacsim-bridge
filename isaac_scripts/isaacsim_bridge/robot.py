@@ -7,7 +7,7 @@ from isaacsim.core.api import World
 from isaacsim.core.utils.stage import add_reference_to_stage, get_current_stage
 from pxr import Usd, UsdPhysics
 
-from sim_bridge.config import ROBOT_CFG, ROBOT_PACK, SIM_CFG
+from isaacsim_bridge.config import ROBOT_CFG, ROBOT_PACK, SIM_CFG
 
 
 def build_world() -> World:

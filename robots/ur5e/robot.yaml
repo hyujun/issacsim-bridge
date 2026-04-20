@@ -33,7 +33,7 @@ drive:
   damping: 100.0
 
 # Simulation loop configuration. See docs/ARCHITECTURE.md#simulation-modes.
-# All fields have defaults in sim_bridge/config.py — omit any to use defaults.
+# All fields have defaults in isaacsim_bridge/config.py — omit any to use defaults.
 sim:
   # "freerun": sim steps at render_rate_hz, publishes on publish_rate_hz timer.
   # "sync":    external controller drives via /joint_command; each cmd -> one

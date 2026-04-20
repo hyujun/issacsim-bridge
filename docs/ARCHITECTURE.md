@@ -38,14 +38,14 @@ World.step()             [Isaac Sim 프로세스]
 
 ## Joint bridge 경로 — OmniGraph 가 아닌 rclpy sidechannel
 
-`/clock` 은 OmniGraph `ROS2PublishClock` 노드로 퍼블리시합니다. 반면 `/joint_states` · `/joint_command` 는 **OmniGraph 를 쓰지 않고** `sim_bridge/main_loop.py` 의 시뮬 루프 안에 심은 rclpy 노드로 처리합니다. 이유는 Isaac Sim 6.0.0-dev2 의 PhysX-tensor 기반 OmniGraph 노드 (`ROS2PublishJointState`, `IsaacArticulationController`) 가 Newton 이 만든 articulation 의 `URDFImporter` 출력을 삼키지 못하고 SEGV 하기 때문입니다. 자세한 내용은 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) 의 "PhysX-tensor joint 노드 SEGV" 항목.
+`/clock` 은 OmniGraph `ROS2PublishClock` 노드로 퍼블리시합니다. 반면 `/joint_states` · `/joint_command` 는 **OmniGraph 를 쓰지 않고** `isaacsim_bridge/main_loop.py` 의 시뮬 루프 안에 심은 rclpy 노드로 처리합니다. 이유는 Isaac Sim 6.0.0-dev2 의 PhysX-tensor 기반 OmniGraph 노드 (`ROS2PublishJointState`, `IsaacArticulationController`) 가 Newton 이 만든 articulation 의 `URDFImporter` 출력을 삼키지 못하고 SEGV 하기 때문입니다. 자세한 내용은 [TROUBLESHOOTING.md](TROUBLESHOOTING.md) 의 "PhysX-tensor joint 노드 SEGV" 항목.
 
-사이드채널 구현은 Newton 의 tensor **ArticulationView** 를 사용합니다 (`sim_bridge/newton_view.py` 에서 생성, `torch` frontend + `cuda:0`):
+사이드채널 구현은 Newton 의 tensor **ArticulationView** 를 사용합니다 (`isaacsim_bridge/newton_view.py` 에서 생성, `torch` frontend + `cuda:0`):
 
 - 읽기: `articulation.get_dof_positions(copy=True)` → `(count, max_dofs)` shape 의 torch tensor. cpu() / numpy() 로 옮겨 `sensor_msgs/JointState.position` 에 채움. **단위는 radian** — Newton 내부가 radian 이므로 ROS 와 변환 불필요.
 - 쓰기: 수신한 `JointState` 를 DOF 인덱스로 매핑해 `articulation.set_dof_position_targets(buffer, indices0)` 로 기록. 내부적으로 Newton `control.joint_target_pos` 에 라우팅되며, `apply_drive_gains_to_joints()` 가 pre-reset 에 주입한 stiffness/damping 으로 POSITION-mode JOINT_TARGET actuator 가 PD servo 로 구동.
 
-ArticulationView pattern 은 **`PhysicsArticulationRootAPI` (또는 `NewtonArticulationRootAPI`) 가 붙은 prim 경로** 를 지정해야 합니다. URDFImporter 출력에서는 `/World/Robot/Geometry/world/base_link` 같은 링크 prim 이 해당 — 레퍼런스 앵커 (`/World/Robot`) 로 지정하면 `count=0` 이 반환됩니다. 로직은 `sim_bridge/robot.py::find_articulation_root_path()` 가 스키마로 스캔해 첫 매칭을 돌려주므로 로봇별 base-link 이름에 독립적입니다.
+ArticulationView pattern 은 **`PhysicsArticulationRootAPI` (또는 `NewtonArticulationRootAPI`) 가 붙은 prim 경로** 를 지정해야 합니다. URDFImporter 출력에서는 `/World/Robot/Geometry/world/base_link` 같은 링크 prim 이 해당 — 레퍼런스 앵커 (`/World/Robot`) 로 지정하면 `count=0` 이 반환됩니다. 로직은 `isaacsim_bridge/robot.py::find_articulation_root_path()` 가 스키마로 스캔해 첫 매칭을 돌려주므로 로봇별 base-link 이름에 독립적입니다.
 
 USD attribute 사이드채널 (`UsdPhysics.JointStateAPI` / `DriveAPI.targetPosition` 에 직접 read/write 하는 방식) 은 **포기**했습니다. 이 번들의 `pxr.UsdPhysics` 에는 `JointStateAPI` 가 아예 없고 (PhysxSchema 로 이동), DriveAPI 경로는 URDFImporter 의 누락된 게인과 결합해 조용히 무동작으로 떨어집니다.
 
@@ -93,12 +93,12 @@ URDFImporter 는 follower 에 대해 **variant set 을 authoring**하므로 comp
 
 | 클럭 | 주기 | 출처 |
 |---|---|---|
-| `physics_dt` | `rendering_dt / sim.substeps` | `sim_bridge/robot.py::build_world()` |
+| `physics_dt` | `rendering_dt / sim.substeps` | `isaacsim_bridge/robot.py::build_world()` |
 | `rendering_dt` | freerun: `1/render_rate_hz` · sync: `1/step_rate_hz` | `build_world()` |
 | `/clock` | physics tick 마다 (sync: cmd 도착 · heartbeat 시점에만 전진) | `ROS2PublishClock` OmniGraph |
 | `/joint_states` | freerun: `publish_rate_hz` timer · sync: 매 `world.step()` 직후 | rclpy sidechannel |
 | `/joint_command` | 호스트 publish rate 에 따름 | rclpy sidechannel |
-| `JointState.header.stamp` | sim-time (`omni.timeline`) — `/clock` 과 동일 타임베이스 | `sim_bridge/main_loop.py` |
+| `JointState.header.stamp` | sim-time (`omni.timeline`) — `/clock` 과 동일 타임베이스 | `isaacsim_bridge/main_loop.py` |
 | 호스트 `use_sim_time` | `/clock` 구독 | 호스트 ROS 2 노드 설정 |
 
 호스트 노드가 `use_sim_time: true` 를 사용하면 `header.stamp` 와 `/clock` 이 정확히 일치합니다 (양쪽 모두 `omni.timeline` 기반).
@@ -149,9 +149,9 @@ loop:
 
 ## 레이어 분리 — agnostic vs robot-specific
 
-Isaac Sim 부트스트랩은 로봇에 대해 모르도록 설계돼 있습니다. 실행 시 `ROBOT_PACK` 환경변수 하나로 `robots/<name>/` 디렉토리를 가리키고, `sim_bridge.config` 가 그 pack 의 `robot.yaml` 만 참고해 USD 레퍼런스·조인트 이름·드라이브 게인·토픽 이름을 가져옵니다. 규약과 pack 추가 방법은 [ROBOTS.md](ROBOTS.md).
+Isaac Sim 부트스트랩은 로봇에 대해 모르도록 설계돼 있습니다. 실행 시 `ROBOT_PACK` 환경변수 하나로 `robots/<name>/` 디렉토리를 가리키고, `isaacsim_bridge.config` 가 그 pack 의 `robot.yaml` 만 참고해 USD 레퍼런스·조인트 이름·드라이브 게인·토픽 이름을 가져옵니다. 규약과 pack 추가 방법은 [ROBOTS.md](ROBOTS.md).
 
-- **agnostic**: `isaac_scripts/launch_sim.py` + `isaac_scripts/sim_bridge/` 패키지, `docker/`, `install.sh` / `build.sh` / `run.sh`.
+- **agnostic**: `isaac_scripts/launch_sim.py` + `isaac_scripts/isaacsim_bridge/` 패키지, `docker/`, `install.sh` / `build.sh` / `run.sh`.
 - **robot-specific**: `robots/<name>/` — URDF, USD, `robot.yaml`, `convert_urdf.py`.
 
 이 경계를 넘지 않는 한 로봇을 바꿔 끼울 수 있습니다.

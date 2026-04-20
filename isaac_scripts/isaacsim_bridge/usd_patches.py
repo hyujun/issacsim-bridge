@@ -23,7 +23,7 @@ import carb
 from isaacsim.core.utils.stage import get_current_stage
 from pxr import Usd, UsdPhysics
 
-from sim_bridge.config import ROBOT_CFG
+from isaacsim_bridge.config import ROBOT_CFG
 
 
 def repair_joint_chain(prim_path: str, articulation_root_name: str) -> int:

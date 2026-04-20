@@ -1,4 +1,4 @@
-# issacsim-bridge
+# isaacsim-bridge
 
 Isaac Sim (Newton physics backend) ↔ ROS 2 Jazzy 브리지 환경. 컨테이너에서 Isaac Sim GUI를 띄우고 `network_mode: host` 를 통해 호스트 ROS 2 와 토픽을 주고받습니다.
 
@@ -37,7 +37,7 @@ ros2 topic hz /clock
 ## 프로젝트 구조
 
 ```
-issacsim-bridge/
+isaacsim-bridge/
 ├── README.md               ← 여기
 ├── install.sh              호스트 prereq 설치·검증              ┐
 ├── build.sh                docker compose pull                 │ robot-agnostic
@@ -46,7 +46,7 @@ issacsim-bridge/
 │   └── docker-compose.yml  Isaac Sim 컨테이너 정의              │
 ├── isaac_scripts/                                               │
 │   ├── launch_sim.py       entry: SimulationApp + 오케스트레이션 │
-│   └── sim_bridge/         런타임 로직 패키지                   │
+│   └── isaacsim_bridge/         런타임 로직 패키지                   │
 │       ├── config.py         ROBOT_PACK + robot.yaml 로드       │
 │       ├── usd_patches.py    URDFImporter 출력 교정              │
 │       ├── robot.py          World, USD ref, articulation root   │
@@ -78,7 +78,7 @@ issacsim-bridge/
     - [x] OmniGraph joint bridge 포기 (PhysX-tensor SEGV) → rclpy sidechannel + Newton ArticulationView
     - [x] `/joint_states` publish + `/joint_command` 로 shoulder_pan 구동 검증
 - [x] Phase 5b — 런타임 cleanup
-    - [x] `sim_bridge/` 패키지 분리 (launch_sim.py 슬림)
+    - [x] `isaacsim_bridge/` 패키지 분리 (launch_sim.py 슬림)
     - [x] USD warning 정리 (zero-mass MassAPI strip, isaac:physics:robotLinks 재작성)
     - [x] py-stderr UserWarning suppression
     - [x] Dual-mode publish loop — **freerun** (기존 동작 유지) + **sync** (외부 제어기 lock-step, `/joint_command` → 1 step → `/joint_states`; `sync_timeout_s` heartbeat). 상세: [docs/ARCHITECTURE.md#시뮬레이션-모드](docs/ARCHITECTURE.md#시뮬레이션-모드)
@@ -95,7 +95,7 @@ issacsim-bridge/
 - 번들 rclpy 는 `/isaac-sim/exts/isaacsim.ros2.core/jazzy/lib` — `LD_LIBRARY_PATH` 에 명시해야 bridge 가 뜸.
 - `World()` backend 를 명시 (`torch`, `cuda:0`) 안 하면 `world.reset` 에서 numpy↔torch mismatch 로 `.detach()` 터짐.
 - PhysX-tensor OmniGraph joint 노드 (`ROS2PublishJointState`, `IsaacArticulationController`) 는 Newton articulation 위에서 SEGV. 그래서 joint 경로는 rclpy sidechannel + Newton ArticulationView tensor API 사용.
-- URDFImporter 출력은 모든 조인트 `physics:body0 = </robot_root>` (star topology). Newton 이 체인을 잃음 → `sim_bridge/usd_patches.py::repair_joint_chain()` 가 body0 = parent(body1) 로 재작성.
+- URDFImporter 출력은 모든 조인트 `physics:body0 = </robot_root>` (star topology). Newton 이 체인을 잃음 → `isaacsim_bridge/usd_patches.py::repair_joint_chain()` 가 body0 = parent(body1) 로 재작성.
 - URDFImporter 가 내뱉는 `DriveAPI:angular` 는 `maxForce` 만 가짐. stiffness/damping 이 없으면 Newton 이 EFFORT 모드로 내려가 6.0.0-dev2 에서는 OmniGraph 코어 세그폴트 → `apply_drive_gains_to_joints()` 가 yaml 게인 주입. (Phase 1.2 검증)
 - (과거 URDFImporter 의 빈 `PhysicsMassAPI` / stale `isaac:physics:robotLinks` 결함 2 가지는 2026-04-20 Phase 1.2 검증으로 제거 — URDFImporter 3.2.1 에서 해결되었거나 패치가 무효했음. 상세: `docs/MIGRATION_PLAN.md`.)
 - Newton `create_articulation_view(pattern)` 의 pattern 은 **`ArticulationRootAPI` 가 붙은 prim 경로** (URDFImporter 출력 기준 `.../base_link`) — 레퍼런스 앵커 (`/World/Robot`) 가 아님.

@@ -8,7 +8,7 @@ Exposes two layers:
   no filesystem side effect at import time, testable on host without a real
   pack.
 * Module-level `ROBOT_PACK` / `ROBOT_CFG` / `SIM_CFG` — legacy convenience
-  for launch_sim.py and sim_bridge submodules. Loaded lazily on first access
+  for launch_sim.py and isaacsim_bridge submodules. Loaded lazily on first access
   via module-level `__getattr__`, so importing this module on a host that
   doesn't have the default pack on disk (e.g. pytest on the host) no longer
   fails — only accessing the constants triggers the load.

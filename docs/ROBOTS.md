@@ -1,16 +1,16 @@
 # Robots
 
-`launch_sim.py` + `sim_bridge/` 는 로봇에 대해 모릅니다. 실행 시 `ROBOT_PACK` 환경변수 하나만 보고, 해당 디렉토리의 **robot pack** 규약대로 에셋과 설정을 읽어 스테이지에 로드합니다. 새 로봇을 추가하는 일은 곧 새 pack 을 만드는 일입니다.
+`launch_sim.py` + `isaacsim_bridge/` 는 로봇에 대해 모릅니다. 실행 시 `ROBOT_PACK` 환경변수 하나만 보고, 해당 디렉토리의 **robot pack** 규약대로 에셋과 설정을 읽어 스테이지에 로드합니다. 새 로봇을 추가하는 일은 곧 새 pack 을 만드는 일입니다.
 
 ## 레이어 경계
 
 | 레이어 | 성격 | 위치 |
 |---|---|---|
-| Isaac Sim bootstrap (Newton, ROS 2 bridge, `/clock`, joint bridge 루프) | **robot-agnostic** | `isaac_scripts/launch_sim.py` + `isaac_scripts/sim_bridge/` |
+| Isaac Sim bootstrap (Newton, ROS 2 bridge, `/clock`, joint bridge 루프) | **robot-agnostic** | `isaac_scripts/launch_sim.py` + `isaac_scripts/isaacsim_bridge/` |
 | Sim/infra 설정 (Docker, ROS 도메인, FastDDS 전송) | **robot-agnostic** | `docker/`, `install.sh`, `build.sh`, `run.sh` |
 | URDF, USD, joint 이름, home pose, drive 게인 | **robot-specific** | `robots/<name>/` |
 
-`launch_sim.py` / `sim_bridge/` 안에는 로봇 이름·조인트 수·드라이브 튜닝이 하드코딩돼 있지 않습니다. 반대로 `robots/<name>/` 안에는 Isaac Sim 부트스트랩 코드가 들어가지 않습니다.
+`launch_sim.py` / `isaacsim_bridge/` 안에는 로봇 이름·조인트 수·드라이브 튜닝이 하드코딩돼 있지 않습니다. 반대로 `robots/<name>/` 안에는 Isaac Sim 부트스트랩 코드가 들어가지 않습니다.
 
 ## Pack 디렉토리 레이아웃
 
@@ -64,11 +64,11 @@ ros:
 
 ## 런타임 계약
 
-`sim_bridge/` 가 pack 에 대해 가정하는 것:
+`isaacsim_bridge/` 가 pack 에 대해 가정하는 것:
 
 1. `prim_path` 밑 어딘가에 `joint_names` 와 매칭되는 `PhysicsRevoluteJoint` prim 들이 존재한다. (정확한 하위 경로는 자유 — Newton ArticulationView 가 DOF 이름으로 매핑.)
-2. `prim_path` 계층 어딘가의 prim 이 `PhysicsArticulationRootAPI` 또는 `NewtonArticulationRootAPI` 를 가진다. 이름·위치는 자유 — `sim_bridge/robot.py::find_articulation_root_path()` 가 스키마로 스캔.
-3. URDFImporter 출력의 알려진 결함 **두 가지**는 `sim_bridge/usd_patches.py` 의 runtime patch 로 교정되므로 pack 에서 추가 작업 불필요:
+2. `prim_path` 계층 어딘가의 prim 이 `PhysicsArticulationRootAPI` 또는 `NewtonArticulationRootAPI` 를 가진다. 이름·위치는 자유 — `isaacsim_bridge/robot.py::find_articulation_root_path()` 가 스키마로 스캔.
+3. URDFImporter 출력의 알려진 결함 **두 가지**는 `isaacsim_bridge/usd_patches.py` 의 runtime patch 로 교정되므로 pack 에서 추가 작업 불필요:
    - 모든 조인트의 `physics:body0` 이 robot root 로 고정된 star topology → `repair_joint_chain()` 이 `parent(body1)` 로 재작성. `robot.root_link` 에 해당하는 world-anchor 조인트만 예외 처리.
    - `DriveAPI:angular` 가 `maxForce` 만 가짐 → `apply_drive_gains_to_joints()` 가 `robot.yaml` 의 stiffness/damping 주입. 6.0.0-dev2 에서는 이 패치 없으면 OmniGraph 코어 세그폴트 (Phase 1.2 검증). **단 mimic follower (NewtonMimicAPI 또는 PhysxMimicJointAPI:* 적용된 조인트) 는 skip** — 아래 mimic 섹션 참조.
 

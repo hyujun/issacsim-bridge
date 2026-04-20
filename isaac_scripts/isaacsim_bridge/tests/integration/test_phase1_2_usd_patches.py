@@ -1,6 +1,6 @@
 """Phase 1.2 — per-patch USD-patch validation harness.
 
-For each USD patch in [sim_bridge/usd_patches.py](../../usd_patches.py), run the
+For each USD patch in [isaacsim_bridge/usd_patches.py](../../usd_patches.py), run the
 full sim bootstrap with that *single* patch suppressed (other 3 still active)
 and scan the log for the expected regression signature. If a patch is no
 longer needed, its absence won't regress — we remove the patch.
@@ -27,7 +27,7 @@ import pytest
 pytestmark = pytest.mark.phase12
 
 _REPO_ROOT = Path(__file__).resolve().parents[4]
-_RUN_SMOKE = _REPO_ROOT / "isaac_scripts" / "sim_bridge" / "tests" / "integration" / "run_smoke.sh"
+_RUN_SMOKE = _REPO_ROOT / "isaac_scripts" / "isaacsim_bridge" / "tests" / "integration" / "run_smoke.sh"
 
 # Expected regression signatures — if we skip a patch and see these in the log,
 # the patch is still required. Regex applied against the full captured log.

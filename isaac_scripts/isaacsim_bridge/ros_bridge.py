@@ -9,7 +9,7 @@ import carb
 import rclpy
 from sensor_msgs.msg import JointState
 
-from sim_bridge.config import ROBOT_CFG
+from isaacsim_bridge.config import ROBOT_CFG
 
 
 def setup_clock_publisher() -> None:
@@ -38,7 +38,7 @@ def setup_clock_publisher() -> None:
 def setup_rclpy_bridge() -> tuple:
     """Initialize rclpy, create publisher + subscriber, return (node, pub, latest_cmd)."""
     rclpy.init(args=[])
-    node = rclpy.create_node("isaac_sim_bridge")
+    node = rclpy.create_node("isaac_isaacsim_bridge")
 
     js_topic = ROBOT_CFG["ros"]["joint_states_topic"]
     jc_topic = ROBOT_CFG["ros"]["joint_command_topic"]

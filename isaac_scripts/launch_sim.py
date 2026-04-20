@@ -4,7 +4,7 @@ Robot-agnostic. Loads a "robot pack" from $ROBOT_PACK (defaults to
 /workspace/robots/ur5e). See docs/ROBOTS.md for the pack contract.
 
 This entry owns SimulationApp bring-up and orchestration only. All runtime
-logic lives in the `sim_bridge/` package next to this file. Submodules are
+logic lives in the `isaacsim_bridge/` package next to this file. Submodules are
 imported AFTER SimulationApp is up so they can freely import pxr / kit.
 
 Env flags:
@@ -22,7 +22,7 @@ import warnings
 # Third-party UserWarning/DeprecationWarning that Newton and warp emit to
 # stderr end up tagged `[Error] [py stderr]` by carb's stderr capture. Filter
 # the known-noisy sources before SimulationApp boots Python's warning system.
-# Keep patterns narrow so sim_bridge/* warnings still surface.
+# Keep patterns narrow so isaacsim_bridge/* warnings still surface.
 warnings.filterwarnings("ignore", category=UserWarning, module=r"newton\._src\..*")
 warnings.filterwarnings("ignore", category=UserWarning, module=r"warp\..*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"warp\..*")
@@ -57,12 +57,12 @@ simulation_app.update()
 
 import carb  # noqa: E402
 
-from sim_bridge.config import ROBOT_CFG, ROBOT_PACK  # noqa: E402
-from sim_bridge.main_loop import run  # noqa: E402
-from sim_bridge.newton_view import setup_newton_articulation  # noqa: E402
-from sim_bridge.robot import assert_newton_backend, build_world, load_robot  # noqa: E402
-from sim_bridge.ros_bridge import setup_clock_publisher, setup_rclpy_bridge  # noqa: E402
-from sim_bridge.usd_patches import (  # noqa: E402
+from isaacsim_bridge.config import ROBOT_CFG, ROBOT_PACK  # noqa: E402
+from isaacsim_bridge.main_loop import run  # noqa: E402
+from isaacsim_bridge.newton_view import setup_newton_articulation  # noqa: E402
+from isaacsim_bridge.robot import assert_newton_backend, build_world, load_robot  # noqa: E402
+from isaacsim_bridge.ros_bridge import setup_clock_publisher, setup_rclpy_bridge  # noqa: E402
+from isaacsim_bridge.usd_patches import (  # noqa: E402
     apply_drive_gains_to_joints,
     repair_joint_chain,
 )

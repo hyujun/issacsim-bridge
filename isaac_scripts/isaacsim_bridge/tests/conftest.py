@@ -1,6 +1,6 @@
 """pytest config for host-side unit tests.
 
-Most of sim_bridge/* requires Isaac Sim (pxr, newton, omni, rclpy) and can
+Most of isaacsim_bridge/* requires Isaac Sim (pxr, newton, omni, rclpy) and can
 only run inside the container. Host-side tests cover the pure-Python logic —
 config parsing, DOF name mapping, GUI action dispatch — so they can run in
 CI without pulling 20GB of Isaac Sim.
@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-# Make `sim_bridge` importable without installing the package.
+# Make `isaacsim_bridge` importable without installing the package.
 _SCRIPTS_DIR = Path(__file__).resolve().parents[2]
 if str(_SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPTS_DIR))

@@ -4,9 +4,9 @@ import carb
 import isaacsim.physics.newton as newton_ext
 from isaacsim.physics.newton import tensors as newton_tensors
 
-from sim_bridge.config import ROBOT_CFG
-from sim_bridge.dof_map import build_dof_index_map
-from sim_bridge.robot import find_articulation_root_path
+from isaacsim_bridge.config import ROBOT_CFG
+from isaacsim_bridge.dof_map import build_dof_index_map
+from isaacsim_bridge.robot import find_articulation_root_path
 
 
 def setup_newton_articulation(prim_path: str) -> tuple:
