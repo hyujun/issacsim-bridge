@@ -29,6 +29,10 @@ def pytest_configure(config):
         "markers",
         "phase12: slow Phase 1.2 integration test (boots Isaac Sim container). Opt-in via `-m phase12`.",
     )
+    config.addinivalue_line(
+        "markers",
+        "phase6: slow Phase 6 dual-pack regression gate (boots Isaac Sim container per pack). Opt-in via `-m phase6`.",
+    )
 
 
 def pytest_collection_modifyitems(config, items):
@@ -45,10 +49,11 @@ def pytest_collection_modifyitems(config, items):
             if "container" in item.keywords:
                 item.add_marker(skip_marker)
 
-    # Auto-skip phase12 unless the user explicitly opts in.
+    # Auto-skip slow phase-tagged harnesses unless the user explicitly opts in.
     marker_expr = config.getoption("-m") or ""
-    if "phase12" not in marker_expr:
-        skip_phase12 = pytest.mark.skip(reason="phase12 harness is opt-in; rerun with `-m phase12`")
-        for item in items:
-            if "phase12" in item.keywords:
-                item.add_marker(skip_phase12)
+    for marker in ("phase12", "phase6"):
+        if marker not in marker_expr:
+            skip = pytest.mark.skip(reason=f"{marker} harness is opt-in; rerun with `-m {marker}`")
+            for item in items:
+                if marker in item.keywords:
+                    item.add_marker(skip)

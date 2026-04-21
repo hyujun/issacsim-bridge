@@ -31,9 +31,29 @@ case "${MODE}" in
   shell)   docker compose exec isaac-sim bash ;;
   restart) docker compose down && docker compose up ;;
   convert) docker compose run --rm --no-deps isaac-sim "${ROBOT_PACK}/convert_urdf.py" ;;
+  list)
+    # Enumerate available packs — name · DOF · sim.mode. Reads robot.yaml on host
+    # via python3+yaml (no docker round-trip). If python3-yaml is missing, fall
+    # back to name-only listing.
+    printf '%-22s %s\n' "PACK" "CONTENTS"
+    for yaml in "${SCRIPT_DIR}"/robots/*/robot.yaml; do
+      [ -f "${yaml}" ] || continue
+      name="$(basename "$(dirname "${yaml}")")"
+      details="$(python3 -c '
+import sys, yaml
+c = yaml.safe_load(open(sys.argv[1]))
+n = len(c.get("joint_names") or [])
+m = (c.get("sim") or {}).get("mode", "freerun")
+r = (c.get("robot") or {}).get("root_link", "?")
+print(f"{n} DoF, sim.mode={m}, root_link={r}")
+' "${yaml}" 2>/dev/null)" || details=""
+      printf '%-22s %s\n' "${name}" "${details:-(parse failed)}"
+    done
+    ;;
   *)
-    echo "usage: $0 [up|upd|down|logs|shell|restart|convert]" >&2
+    echo "usage: $0 [up|upd|down|logs|shell|restart|convert|list]" >&2
     echo "  ROBOT=<name> selects robots/<name>/ (default: ur5e)" >&2
+    echo "  list         enumerate available robot packs" >&2
     exit 1
     ;;
 esac

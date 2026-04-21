@@ -12,7 +12,7 @@
 
 ---
 
-## Resume Point (2026-04-20 세션 종료 시점)
+## Resume Point (2026-04-21 세션 종료 시점)
 
 **새 대화에서 시작하려면**: 아래 스냅샷을 읽고, "다음 작업" 섹션에서 한 항목을 선택해서 착수하면 됩니다.
 
@@ -21,15 +21,16 @@
 | Phase | 상태 | 핵심 산출물 |
 |---|---|---|
 | 1.1 이미지 태그 재평가 | ✅ | `6.0.0-dev2` 유지 결정. 네이티브 전환 타겟 4개 확인 (`isaacsim.core.experimental.prims.Articulation`, `isaacsim.ros2.nodes`, `ROS2PublishJointState` sensor-input 경로, `IsaacReadJointState`) |
-| 1.2 USD 패치 per-patch 검증 | ✅ | USD 패치 4 → 2 감소 (`strip_zero_mass_api` · `populate_robot_schema_links` 삭제). 테스트 인프라 22 tests + docker smoke harness 신설 |
+| 1.2 USD 패치 per-patch 검증 | ✅ | USD 패치 4 → 2 감소 (`strip_zero_mass_api` · `populate_robot_schema_links` 삭제). 테스트 인프라 초안 + docker smoke harness 신설 |
+| 6 robot-agnostic 레이어 검증 (side-quest) | ✅ | 정적 감사 · pack-declared `host_deps.txt` · `validate_robot_config` · runtime DOF 어써션 · `pytest -m phase6` dual-pack regression gate · `run.sh list` · 스키마 청소 (`joints_subpath` 제거) |
 
 ### 다음 대화 진입 체크리스트
 
-1. `git log --oneline -5` 로 마지막 커밋 (Phase 1.2 마무리) 확인.
+1. `git log --oneline -5` 로 마지막 커밋 확인.
 2. 호스트 유닛 테스트 상태 확인:
    ```bash
    cd isaac_scripts && pytest isaacsim_bridge/tests/ -v --ignore=isaacsim_bridge/tests/integration
-   # 22/22 통과해야 정상
+   # 32/32 통과해야 정상 (config validator 9 tests + dof_map 10 tests + config base 13 tests)
    ```
 3. 본 문서 "전체 진행 순서" (최하단) 를 읽고 착수할 Phase 선택.
 
@@ -41,9 +42,9 @@
 - 테스트: 액션 dispatch 를 `set_targets(targets, latest_cmd)` 같은 순수 함수로 분리 → 호스트 유닛 테스트 가능. GUI 자체는 컨테이너 smoke test.
 
 **옵션 B — Phase 1.3 (OmniGraph 네이티브 joint bridge)** — 리스크 중간, 파급 큼
-- 선행 조건: 없음 (1.2 완료 상태에서 바로 가능)
-- 착수: `isaacsim.ros2.nodes` + `isaacsim.sensors.physics.nodes` 를 [launch_sim.py:53-55](../isaac_scripts/launch_sim.py#L53-L55) 의 `enable_extension` 목록에 추가 → `/World/ROS2JointStateGraph` OmniGraph 에 `IsaacReadJointState` + `ROS2PublishJointState` (sensor-input 경로) 구성 → smoke test 로 SEGV 재현 여부 확인.
-- smoke test: 기존 [run_smoke.sh](../isaac_scripts/isaacsim_bridge/tests/integration/run_smoke.sh) 에 새 env flag (`SIM_BRIDGE_MODE=omnigraph|rclpy`) 추가해서 양쪽 경로 비교.
+- 선행 조건: 없음 (1.2 완료 상태에서 바로 가능). Phase 6 regression gate 가 먼저 깔려 있어 1.3 변경이 agnostic 경계를 부수면 즉시 감지됨.
+- 착수: `isaacsim.ros2.nodes` + `isaacsim.sensors.physics.nodes` 를 [launch_sim.py:52-54](../isaac_scripts/launch_sim.py#L52-L54) 의 `enable_extension` 목록에 추가 → `/World/ROS2JointStateGraph` OmniGraph 에 `IsaacReadJointState` + `ROS2PublishJointState` (sensor-input 경로) 구성 → smoke test 로 SEGV 재현 여부 확인.
+- smoke test: 기존 [run_smoke.sh](../isaac_scripts/isaacsim_bridge/tests/integration/run_smoke.sh) 에 새 env flag (`SIM_BRIDGE_MODE=omnigraph|rclpy`) 추가해서 양쪽 경로 비교. `pytest -m phase6` 으로 두 pack 모두 regress 없는지 확인.
 - 실패 시 (SEGV 재현): 현재 rclpy sidechannel 유지하고 주석에 "PhysX-tensor SEGV still blocks on image vX.Y.Z" 기록 + 다음 릴리스 대기.
 
 ### 현재 코드 상태 요약
@@ -51,127 +52,40 @@
 - **USD 패치 2 종** 만 활성: `repair_joint_chain` (body0 star topology 수정), `apply_drive_gains_to_joints` (stiffness/damping 주입 + mimic follower skip). 둘 다 skip 시 각각 `max_dofs=0` / OmniGraph 코어 세그폴트 재현 확정.
 - **ROS bridge 는 여전히 rclpy sidechannel** — [isaacsim_bridge/ros_bridge.py](../isaac_scripts/isaacsim_bridge/ros_bridge.py) 의 `setup_rclpy_bridge()`. OmniGraph 네이티브 전환은 Phase 1.3 에서 수행.
 - **Articulation 경로** 는 여전히 Newton tensor ArticulationView — [isaacsim_bridge/newton_view.py](../isaac_scripts/isaacsim_bridge/newton_view.py). `isaacsim.core.experimental.prims.Articulation` 전환은 Phase 1.4 에서 수행 (1.3 결과에 따라 필요 여부 결정).
-- **테스트 인프라**: 22 host unit tests (`isaacsim_bridge/tests/test_config.py`, `test_dof_map.py`) + docker smoke harness (`isaacsim_bridge/tests/integration/`). `pytest -m phase12` 로 per-patch 회귀 검증 재실행 가능.
-- **환경 변수**: [launch_sim.py:34-36](../isaac_scripts/launch_sim.py#L34-L36) 의 `SIM_HEADLESS`, `SIM_SKIP_PATCHES`, `SIM_MAX_RUN_SECONDS`.
+- **Pack contract**: [isaacsim_bridge/config.py::validate_robot_config](../isaac_scripts/isaacsim_bridge/config.py) 가 bootstrap 시 lazy 로 자동 호출. 누락 필드·빈 joint_names·잘못된 drive.mode·urdf 미발견 한 번에 보고. [newton_view.py::setup_newton_articulation](../isaac_scripts/isaacsim_bridge/newton_view.py) 은 `max_dofs == len(joint_names)` 를 런타임 assert.
+- **Pack host apt deps**: 각 pack 의 `robots/<name>/host_deps.txt` 에서 선언. `install.sh` 가 글롭 합집합 설치. agnostic `install.sh` 에는 robot-specific 리터럴 없음.
+- **테스트 인프라**: 32 host unit tests (config 13 + config validator 9 + dof_map 10) + docker smoke harness (`isaacsim_bridge/tests/integration/`). `pytest -m phase12` 로 per-patch 회귀 검증, `pytest -m phase6` 로 pack 별 agnostic-layer regression 재실행. Phase 6 harness 는 `robots/*/robot.yaml` auto-discover — 새 pack 자동 등록.
+- **환경 변수**: [launch_sim.py:33-35](../isaac_scripts/launch_sim.py#L33-L35) 의 `SIM_HEADLESS`, `SIM_SKIP_PATCHES`, `SIM_MAX_RUN_SECONDS`.
 
 ---
 
 ## Phase 1 — 네이티브 API 이관
 
-### 1.1 Isaac Sim 이미지 태그 재평가
+### 1.1 Isaac Sim 이미지 태그 재평가 ✅ (2026-04-20)
 
-**상태: ✅ 완료 (2026-04-20)**
+**결론**: `6.0.0-dev2` 유지. 업그레이드 필요 없음 (NVIDIA 이력에서 최신 dev 태그). 이미지에 이미 번들돼 있으나 미사용인 네이티브 기능 4 개 확인 → Phase 1.3 / 1.4 재정의의 근거가 됨:
 
-#### 조사 결과
+- **`isaacsim.core.experimental.prims.Articulation`** — Newton-aware wrapper, `fetch_articulation_root_api_prim_paths()` 내장. 우리 [find_articulation_root_path()](../isaac_scripts/isaacsim_bridge/robot.py#L51-L69) + Newton ArticulationView 래핑을 대체 가능 → Phase 1.4 전환 타겟.
+- **`isaacsim.ros2.nodes`** — `isaacsim.ros2.bridge` 에서 분리된 노드 묶음. 추가 `enable_extension` 필요.
+- **`ROS2PublishJointState` v1.10.0** (2026-03-05) — sensor-input 경로로 변경. `targetPrim` 대신 `IsaacReadJointState` 출력을 연결하는 것이 권장. Phase 1.3 SEGV 회피 가능성.
+- **`isaacsim.sensors.physics.nodes` → `IsaacReadJointState`** — PhysX-tensor 직결 아닌 sensor abstraction. SEGV 원인을 우회할 후보.
 
-현재 Docker 이미지: `nvcr.io/nvidia/isaac-sim:6.0.0-dev2` ([docker/docker-compose.yml:3](../docker/docker-compose.yml#L3)).
-
-NVIDIA Isaac Sim 릴리스 이력 (`gh api repos/isaac-sim/IsaacSim/releases`):
-
-| 태그 | 릴리스일 | 유형 |
-|---|---|---|
-| v5.0.0 | 2025-08-08 | GA |
-| v5.1.0 | 2025-10-21 | GA (최신 stable) |
-| v6.0.0-dev | 2025-12-19 | pre-release |
-| **v6.0.0-dev2** | **2026-03-16** | **pre-release (최신, 현재 사용 중)** |
-
-**결론 — 이미지 업그레이드 불가 · 불필요**: 2026-04-20 기준 `6.0.0-dev2` 가 최신이며 newer dev/stable 릴리스 없음. 현재 이미지를 유지하고 이 이미지 **안에 이미 들어있지만 사용하지 않는** 네이티브 기능을 활용하는 방향이 정답.
-
-#### 현재 이미지 안에서 활용 가능한 네이티브 기능 (현재 미사용)
-
-`docker run --rm --entrypoint ls … /isaac-sim/exts` 로 확인한 사용 가능 확장:
-
-1. **`isaacsim.core.experimental.prims.Articulation`** — Newton 네이티브 대응 Articulation 래퍼.
-   - 파일: `/isaac-sim/exts/isaacsim.core.experimental.prims/isaacsim/core/experimental/prims/impl/articulation.py`.
-   - 제공 메서드: `set_dof_position_targets(data, indices)`, `get_dof_positions()`, `num_dofs`, `dof_names`, `joint_names` 등.
-   - 경로 정규식 매칭 + 자동 ArticulationRootAPI prim 탐색 (`fetch_articulation_root_api_prim_paths`).
-   - **우리 측 [find_articulation_root_path()](../isaac_scripts/isaacsim_bridge/robot.py#L51-L69) + Newton ArticulationView 래핑 전체를 대체 가능**.
-
-2. **`isaacsim.ros2.nodes`** — `isaacsim.ros2.bridge` 에서 분리된 OmniGraph 노드 묶음.
-   - 현재 [launch_sim.py:40](../isaac_scripts/launch_sim.py#L40) 는 구 `isaacsim.ros2.bridge` 만 enable 하고 있음 → `ROS2PublishJointState` 등의 노드 사용 시 새 확장 추가 enable 필요.
-
-3. **`ROS2PublishJointState` 데이터 모델 변경 (v1.10.0, 2026-03-05)** — `isaacsim.ros2.nodes/docs/CHANGELOG.md` 인용:
-   > *ROS2PublishJointState node now publishes from sensor inputs (e.g. IsaacReadJointState) for joint state data.*
-
-   `.ogn` 정의 확인 (`OgnROS2PublishJointState.ogn`):
-   - `jointNames`, `jointPositions`, `jointVelocities`, `jointEfforts`, `jointDofTypes`, `stageMetersPerUnit`, `sensorTime` 모두 **inputs** 으로 존재.
-   - `targetPrim` 주석: *"connect instead of targetPrim for preferred path"* → **sensor 경유가 권장 경로**.
-
-4. **`isaacsim.sensors.physics.nodes`** — `IsaacReadJointState` OmniGraph 노드 제공.
-   - `inputs:prim` (target articulation 경로) → `outputs:jointNames, jointPositions, jointVelocities, jointEfforts, jointDofTypes, stageUnits, sensorTime, execOut`.
-   - 이 노드가 articulation state 를 **PhysX tensor 직결이 아닌 sensor abstraction 을 경유**해 읽으므로, `docs/TROUBLESHOOTING.md` 의 "PhysX-tensor joint 노드 SEGV" 를 우회할 가능성이 큼 (smoke test 로 확정 필요).
-
-5. **`IsaacArticulationController` 대안** — `/joint_command` 쪽은 기존 `IsaacArticulationController` 노드가 여전히 PhysX-tensor 직결이라 SEGV 재현 위험. 1.3 단계에서 smoke test 와 함께 대안 후보 (`isaacsim.core.experimental.prims.Articulation` Python bridge) 를 비교 평가.
-
-#### URDFImporter 관련
-
-- URDFImporter 현재 버전: **3.2.1 (2026-03-09)**. 이미지에 번들된 버전 (`/isaac-sim/exts/isaacsim.asset.importer.urdf/docs/CHANGELOG.md`).
-- 3.0.0 (2026-02-01) 에서 "USD exchange based backend / Unified UI / Asset structure 3" 로 대전환.
-- 3.1.0 (2026-02-26) 에서 Newton schema 대응 변환 속성 추가.
-- 2.4.37 (2026-01-05) 에서 mimic 순서 버그 수정.
-- **CHANGELOG 에 body0 star topology 수정 · 빈 MassAPI 억제 · DriveAPI gain 기본값 수정 관련 항목은 보이지 않음** → USD 런타임 패치 4종 중 1~3 은 여전히 필요할 가능성이 높음. 단 실제 재변환 후 per-patch 실험 필요 (1.2 에서 처리).
-
-#### 1.1 의사결정
-
-| 결정 | 이유 |
-|---|---|
-| 이미지 태그 유지 (`6.0.0-dev2`) | 최신 태그이며 다음 릴리스 미정 |
-| Phase 1.3 을 "OmniGraph 네이티브 joint bridge" 로 재정의 | 새 sensor-input 데이터 모델이 SEGV 회피 가능성 제공 |
-| Phase 1.4 을 "`isaacsim.core.experimental.prims.Articulation` 전환" 으로 재정의 | 네이티브 Newton-aware 래퍼 존재 확인 |
-| 1.2 의 USD 패치 검증은 유지 | 재변환 후 각 patch on/off smoke test 필요 |
+URDFImporter **3.2.1** (2026-03-09) 번들. CHANGELOG 에 body0 star topology / MassAPI / DriveAPI gain 관련 항목 없음 — 패치 필요 여부는 1.2 에서 per-patch 실측.
 
 ---
 
-### 1.2 USD 런타임 패치 per-patch 검증
+### 1.2 USD 런타임 패치 per-patch 검증 ✅ (2026-04-20)
 
-**상태: ✅ 완료 (2026-04-20)**
+URDFImporter 3.2.1 출력에 대해 기존 4 개 패치를 하나씩 skip 하며 smoke test. 결과 **2 개 제거** (`strip_zero_mass_api` — MassAPI 가 더 이상 virtual 링크에 붙지 않음; `populate_robot_schema_links` — 패치가 실제로 무효). `repair_joint_chain` 은 여전히 필수 (skip → `max_dofs=0`). `apply_drive_gains` 는 **필수로 격상** — skip 시 OmniGraph 코어 **하드 세그폴트** (이전 이미지에서는 cosmetic warning 에 불과했음).
 
-목표: [isaac_scripts/isaacsim_bridge/usd_patches.py](../isaac_scripts/isaacsim_bridge/usd_patches.py) 의 4 개 함수 각각이 URDFImporter 3.2.1 출력에서 여전히 필요한지 재확인.
+남은 활성 패치 2 종과 재현 시나리오 상세: [memory/urdfimporter_600_dev2_quirks.md](../../../.claude/projects/-home-junho-ros2-ws-isaacsim-bridge/memory/urdfimporter_600_dev2_quirks.md) · [docs/TROUBLESHOOTING.md#drive-gain-누락](TROUBLESHOOTING.md).
 
-#### 진행 절차
+신설된 테스트 인프라 (이후 Phase 에서 재사용 중):
 
-1. pytest 테스트 인프라 구축: [isaac_scripts/isaacsim_bridge/tests/](../isaac_scripts/isaacsim_bridge/tests/) 신설.
-2. [isaacsim_bridge/config.py](../isaac_scripts/isaacsim_bridge/config.py) 를 순수 함수 기반으로 리팩터 (lazy module-level constants 로 하위 호환 유지).
-3. [isaacsim_bridge/dof_map.py](../isaac_scripts/isaacsim_bridge/dof_map.py) 신설 — Newton 의존성 없는 DOF name ↔ index 매핑 순수 함수.
-4. [launch_sim.py](../isaac_scripts/launch_sim.py) 에 `SIM_HEADLESS` / `SIM_SKIP_PATCHES` / `SIM_MAX_RUN_SECONDS` 환경 변수 추가.
-5. [tests/integration/run_smoke.sh](../isaac_scripts/isaacsim_bridge/tests/integration/run_smoke.sh) — `docker compose run --rm` 래퍼로 헤드리스 smoke test 실행.
-6. [tests/integration/test_phase1_2_usd_patches.py](../isaac_scripts/isaacsim_bridge/tests/integration/test_phase1_2_usd_patches.py) — 4 개 per-patch smoke test harness.
-
-#### 유닛 테스트 결과
-
-| 대상 | 테스트 수 | 결과 |
-|---|---|---|
-| [tests/test_config.py](../isaac_scripts/isaacsim_bridge/tests/test_config.py) | 12 | ✅ 12/12 |
-| [tests/test_dof_map.py](../isaac_scripts/isaacsim_bridge/tests/test_dof_map.py) | 10 | ✅ 10/10 |
-| **합계** | **22** | **✅ 22/22** |
-
-#### Smoke test 결과 (UR5e, ur5e pack, URDFImporter 3.2.1)
-
-baseline (모든 패치 활성): bootstrap @ 103.9s, max_dofs=6, 세그폴트 없음.
-
-| 패치 | skip 시 증상 | 결정 |
-|---|---|---|
-| `repair_joint_chain` | `ArticulationView count=1 max_dofs=0` + `Newton model articulations: [12 entries]` (star topology) | **✅ 유지** |
-| `strip_zero_mass_api` | baseline 과 동일 — "zero mass" 경고 **0 회** | **❌ 제거** (URDFImporter 3.2.1 이 MassAPI 를 더 이상 virtual 링크에 붙이지 않거나 Newton 이 경고 안 찍음) |
-| `populate_robot_schema_links` | baseline 과 동일 — "missing from schema relationship" 경고 **1 회** (패치 적용과 동일) | **❌ 제거** (패치가 무효함. 경고는 cosmetic 이라 무해) |
-| `apply_drive_gains` | OmniGraph 코어 **하드 세그폴트** during `/World/ROS2ClockGraph` 노드 생성 — 이전 memory 의 "unresolved target" 경고보다 훨씬 critical | **✅ 유지** |
-
-#### 변경 사항
-
-- [isaacsim_bridge/usd_patches.py](../isaac_scripts/isaacsim_bridge/usd_patches.py) 에서 `strip_zero_mass_api` / `populate_robot_schema_links` 함수 삭제. 모듈 docstring 에 제거 사유 기록.
-- [launch_sim.py](../isaac_scripts/launch_sim.py) 의 `_PATCHES` 리스트 · imports 정리.
-- 제거 후 재 smoke test: bootstrap @ 94.6s 정상 완료, max_dofs=6, 회귀 0건.
-
-#### 체크리스트
-
-- [x] baseline 기동 + 관측 로그 기록
-- [x] `repair_joint_chain` 필요성 재확인 → **유지**
-- [x] `strip_zero_mass_api` 필요성 재확인 → **제거**
-- [x] `populate_robot_schema_links` 필요성 재확인 → **제거**
-- [x] `apply_drive_gains_to_joints` (mimic skip 포함) 필요성 재확인 → **유지 (필수 격상)**
-- [x] 불필요한 패치 삭제 + 문서 정리 (이 항목)
-- [ ] robotiq_2f_85 에서도 동일 검증 (추후 — ur5e 에서 이미 확정)
-- [ ] 메모리 `urdfimporter_600_dev2_quirks.md` 업데이트 (1.5 단계로 이관)
+- 호스트 유닛 pytest (`isaacsim_bridge/tests/test_{config,dof_map}.py`).
+- [tests/integration/run_smoke.sh](../isaac_scripts/isaacsim_bridge/tests/integration/run_smoke.sh) — `docker compose run --rm` 헤드리스 smoke wrapper.
+- [tests/integration/test_phase1_2_usd_patches.py](../isaac_scripts/isaacsim_bridge/tests/integration/test_phase1_2_usd_patches.py) — per-patch 회귀 harness (`pytest -m phase12`).
+- [launch_sim.py](../isaac_scripts/launch_sim.py) 의 `SIM_HEADLESS` / `SIM_SKIP_PATCHES` / `SIM_MAX_RUN_SECONDS` 환경 변수.
 
 ---
 

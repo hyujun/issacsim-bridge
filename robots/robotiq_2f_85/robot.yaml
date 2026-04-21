@@ -2,7 +2,6 @@ robot:
   urdf_rel: urdf/robotiq_2f_85.urdf
   usd_rel: usd/robotiq_2f_85/robotiq_2f_85.usda
   prim_path: /World/Robot
-  joints_subpath: Physics
   # URDF root link after the virtual `world` link. The world->base_joint fixed
   # joint keeps body0 = robot root Xform (Newton treats as world anchor).
   root_link: robotiq_85_base_link

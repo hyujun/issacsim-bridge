@@ -5,8 +5,6 @@ robot:
   usd_rel: usd/ur5e/ur5e.usda
   # Stage location for the referenced robot — agnostic of robot name.
   prim_path: /World/Robot
-  # Child scope under prim_path that contains revolute joint prims (URDFImporter default: "Physics").
-  joints_subpath: Physics
   # URDF root link name. The world-anchor fixed joint (body1 == root_link) must
   # keep body0 = robot root Xform during repair_joint_chain. Required.
   root_link: base_link

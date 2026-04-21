@@ -31,7 +31,6 @@ robot:
   urdf_rel: urdf/<name>.urdf          # pack 기준 상대경로
   usd_rel: usd/<name>/<name>.usda     # URDFImporter 출력 내부 경로
   prim_path: /World/Robot             # 스테이지 위치. 관례상 agnostic 이름
-  joints_subpath: Physics             # 참고용 — Newton ArticulationView 가 DOF 이름을 자동 매핑하므로 실제 조회에는 사용되지 않음
   root_link: base_link                # (필수) URDF root link 이름. `repair_joint_chain` 이 world-anchor 고정 조인트 (body1 == root_link) 를 식별하는 데 사용 — 해당 조인트의 body0 은 robot root Xform 에 남겨둬야 Newton 이 world anchor 로 취급.
 
 joint_names:                          # /joint_states 에 publish 되는 조인트. driver 우선, mimic follower 는 뒤. mimic 이 있으면 controller 는 driver 만 /joint_command 로 보내도 follower 가 solver constraint 로 따라옴.
@@ -130,11 +129,13 @@ ROBOT_PACK=/workspace/robots/ur5e ./run.sh
 
 ## 새 로봇 추가 체크리스트
 
-1. `robots/<name>/urdf/` 에 URDF + meshes 배치.
-2. `robots/<name>/robot.yaml` 작성 (위 스키마 참고). `joint_names` 순서는 호스트 제어기와 공유하는 계약이므로 신중히.
+1. `robots/<name>/urdf/` 에 URDF + meshes 배치. (xacro 원본이면 `build_urdf.sh` 를 같이 두고 그 결과물을 커밋.)
+2. `robots/<name>/robot.yaml` 작성 (위 스키마 참고). `joint_names` 순서는 호스트 제어기와 공유하는 계약이므로 신중히. 스키마 검증은 `isaacsim_bridge.config.validate_robot_config` 가 기동 시 자동 수행 — 누락 필드·빈 joint_names·잘못된 drive.mode 는 bootstrap 전에 한 번에 보고.
 3. `robots/<name>/convert_urdf.py` — `ur5e/convert_urdf.py` 를 복사해 `URDF_PATH` / `USD_OUT` 만 pack 이름에 맞게 수정.
-4. `ROBOT=<name> ./run.sh convert` 로 USD 생성.
-5. `ROBOT=<name> ./run.sh` 로 기동 후 `ros2 topic hz /joint_states` 확인.
+4. (xacro 를 쓰면) `robots/<name>/host_deps.txt` 에 필요한 apt 패키지 (`ros-jazzy-xacro`, `ros-jazzy-<vendor>-description` 등) 를 한 줄에 하나씩 나열. 다음 `./install.sh` 가 **모든 pack 의 host_deps.txt 합집합** 을 설치.
+5. `ROBOT=<name> ./run.sh convert` 로 USD 생성.
+6. `ROBOT=<name> ./run.sh` 로 기동 후 `ros2 topic hz /joint_states` 확인.
+7. (옵션 · 권장) Phase 6 regression gate 에 자동 등록됨 — `pytest -m phase6 isaac_scripts/isaacsim_bridge/tests/integration/` 는 `robots/*/robot.yaml` 을 글롭으로 수집하므로 새 pack 도 자동 검증 대상. 컨테이너 부트 ~60s/pack.
 
 ## 현재 pack 목록
 

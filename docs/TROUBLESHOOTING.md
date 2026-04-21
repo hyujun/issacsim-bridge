@@ -163,13 +163,8 @@ world = World(
 
 해결: `isaacsim_bridge/usd_patches.py::repair_joint_chain()` 가 pre-reset 에 각 joint 의 `body0` 를 `parent(body1)` 로 재작성. 예외는 `base_link` 를 world 에 고정하는 fixed joint 하나 — 얘는 body0=robot root 를 유지해야 함 (Newton 이 robot root 를 world 로 취급). 재작성 후 `articulation_label` 이 단일 엔트리 + `max_dofs=6` 이 나옵니다.
 
-### ~~`Body .../base_link has zero mass and zero inertia despite having the MassAPI USD schema applied.`~~ (obsolete)
-**Phase 1.2 검증 (2026-04-20)으로 URDFImporter 3.2.1 에서 더 이상 발생하지 않음 확인**. `strip_zero_mass_api` 패치는 `isaacsim_bridge/usd_patches.py` 에서 제거됨. 과거에는 URDFImporter 가 `<inertial>` 블록 없는 frame 링크에도 `PhysicsMassAPI` 를 붙여 Newton 이 mass=0 경고를 5 회 반복했으나, 현재 이미지 (6.0.0-dev2 / URDFImporter 3.2.1) 는 근본 원인을 해결함. 옛 버전으로 되돌린다면 해당 패치를 다시 복원해야 함 — `git log` 에서 `strip_zero_mass_api` 로 찾으면 구현 참고 가능.
-
-### `Robot at /World/Robot has links missing from schema relationship: [...]` (cosmetic, 현재 억제 불가)
-증상: 로그에 위 warning 1 회. 기능 영향 없음. URDFImporter 가 `IsaacRobotAPI::isaac:physics:robotLinks` 관계를 자동 populate 하지만 BFS 결과가 런타임 체인과 불일치하는 경우 발생.
-
-**Phase 1.2 검증 결과**: 과거에 있던 `populate_robot_schema_links` 패치는 **무효했음** — 패치 on/off 양쪽 모두 동일한 경고 1 회 발생. 현재 코드에서는 제거됨. 이 schema 는 Newton 물리 경로에서 소비되지 않으므로 warning 은 무시해도 안전함. 향후 Isaac Sim 업데이트로 URDFImporter 가 이를 정상 populate 하면 자연 해소될 예정.
+### `Robot at /World/Robot has links missing from schema relationship: [...]` (cosmetic)
+로그에 위 warning 1 회. URDFImporter 가 `IsaacRobotAPI::isaac:physics:robotLinks` 를 자동 populate 하지만 BFS 결과가 런타임 체인과 불일치할 때 발생. 이 schema 는 Newton 물리 경로에서 소비되지 않으므로 무시해도 안전. 향후 Isaac Sim 업데이트에서 URDFImporter 가 정상 populate 하면 자연 해소.
 
 ### Drive gain 누락 → OmniGraph 코어 segfault (6.0.0-dev2 에서 격상된 증상)
 증상: `apply_drive_gains_to_joints` 없이 기동하면 `ROS2ClockGraph` 노드 생성 단계에서 Fatal 크래시 → `Segmentation fault (core dumped)`. Phase 1.2 smoke test (2026-04-20) 로 재현 확정.

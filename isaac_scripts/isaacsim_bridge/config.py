@@ -45,6 +45,67 @@ def load_robot_config(pack_path: Path) -> dict:
         return yaml.safe_load(fh)
 
 
+_REQUIRED_FIELDS: tuple[tuple[str, ...], ...] = (
+    ("robot", "urdf_rel"),
+    ("robot", "usd_rel"),
+    ("robot", "prim_path"),
+    ("robot", "root_link"),
+    ("joint_names",),
+    ("drive", "mode"),
+    ("drive", "stiffness"),
+    ("drive", "damping"),
+    ("ros", "joint_states_topic"),
+    ("ros", "joint_command_topic"),
+)
+
+
+def _get_nested(d: dict, path: tuple[str, ...]):
+    cur = d
+    for key in path:
+        if not isinstance(cur, dict) or key not in cur:
+            return _MISSING
+        cur = cur[key]
+    return cur
+
+
+_MISSING = object()
+
+
+def validate_robot_config(cfg: dict, pack_path: Path | None = None) -> None:
+    """Validate robot.yaml shape. Raises ValueError listing every issue.
+
+    Caller gets all problems in one shot — no drip-feed of KeyError.
+    `pack_path` enables on-disk checks (urdf_rel / usd_rel existence); pass
+    None to skip (useful in unit tests with synthetic configs).
+    """
+    errors: list[str] = []
+
+    for path in _REQUIRED_FIELDS:
+        val = _get_nested(cfg, path)
+        if val is _MISSING:
+            errors.append(f"missing required field: {'.'.join(path)}")
+        elif path == ("joint_names",):
+            if not isinstance(val, list) or not val:
+                errors.append("joint_names must be a non-empty list")
+
+    drive = cfg.get("drive") or {}
+    if isinstance(drive, dict) and drive.get("mode") not in (None, "position"):
+        errors.append(f"drive.mode must be 'position' (got {drive['mode']!r})")
+
+    if pack_path is not None:
+        robot = cfg.get("robot") or {}
+        if isinstance(robot, dict):
+            urdf_rel = robot.get("urdf_rel")
+            if isinstance(urdf_rel, str) and not (Path(pack_path) / urdf_rel).is_file():
+                errors.append(f"robot.urdf_rel not found: {pack_path}/{urdf_rel}")
+
+    if errors:
+        preamble = f"robot.yaml validation failed ({len(errors)} issue(s))"
+        if pack_path is not None:
+            preamble += f" in {pack_path}"
+        raise ValueError(preamble + ":\n  - " + "\n  - ".join(errors))
+
+
 def compute_sim_config(robot_cfg: dict) -> dict:
     """Merge robot.yaml `sim:` section with defaults. Validates sim.mode.
 
@@ -78,10 +139,16 @@ def __getattr__(name: str):
         return _LAZY_CACHE["ROBOT_PACK"]
     if name == "ROBOT_CFG":
         if "ROBOT_CFG" not in _LAZY_CACHE:
-            _LAZY_CACHE["ROBOT_CFG"] = load_robot_config(default_pack_path())
+            pack = default_pack_path()
+            cfg = load_robot_config(pack)
+            validate_robot_config(cfg, pack)
+            _LAZY_CACHE["ROBOT_CFG"] = cfg
         return _LAZY_CACHE["ROBOT_CFG"]
     if name == "SIM_CFG":
         if "SIM_CFG" not in _LAZY_CACHE:
-            _LAZY_CACHE["SIM_CFG"] = compute_sim_config(load_robot_config(default_pack_path()))
+            pack = default_pack_path()
+            cfg = load_robot_config(pack)
+            validate_robot_config(cfg, pack)
+            _LAZY_CACHE["SIM_CFG"] = compute_sim_config(cfg)
         return _LAZY_CACHE["SIM_CFG"]
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

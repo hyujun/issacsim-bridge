@@ -1,0 +1,4 @@
+# Host apt packages needed by build_urdf.sh (xacro expansion of
+# robotiq_description on /opt/ros/jazzy). Collected by ../../install.sh.
+ros-jazzy-xacro
+ros-jazzy-robotiq-description

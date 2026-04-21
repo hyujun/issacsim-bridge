@@ -67,20 +67,27 @@ if ! grep -q "nvcr.io" "${HOME}/.docker/config.json" 2>/dev/null; then
   warn "Not logged into nvcr.io. Run: docker login nvcr.io  (username: \$oauthtoken, password: NGC API key)"
 fi
 
-# Robot URDF description packages are consumed on the HOST by each robot pack's
-# build_urdf.sh (host-side xacro expansion), which emits a flat .urdf that is
-# then committed to robots/<name>/urdf/. The container never touches these
-# packages — it only reads the committed URDF.
-log "Checking ROS 2 Jazzy for robot description packages"
+# Agnostic host deps: Cyclone DDS RMW (default transport, see ./run.sh).
+# Pack-specific host deps (e.g. xacro, ros-*-description) are declared per-pack
+# in robots/<name>/host_deps.txt — one apt package per line, blank/# ignored.
+# install.sh collects the union across all packs; the container never reads
+# these since each pack commits its flattened .urdf.
+log "Checking ROS 2 Jazzy for host packages"
 if [ ! -d /opt/ros/jazzy ]; then
-  warn "ROS 2 Jazzy not found at /opt/ros/jazzy — skipping robot description packages."
+  warn "ROS 2 Jazzy not found at /opt/ros/jazzy — skipping apt packages."
   warn "Install ROS 2 Jazzy first (https://docs.ros.org/en/jazzy/Installation.html), then re-run ./install.sh"
 else
-  log "Installing robot URDF description packages and Cyclone DDS RMW"
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  mapfile -t PACK_DEPS < <(
+    shopt -s nullglob
+    for f in "${SCRIPT_DIR}"/robots/*/host_deps.txt; do
+      sed -E 's/#.*$//; s/^[[:space:]]+|[[:space:]]+$//g' "$f"
+    done | grep -v '^$' | sort -u
+  )
+  log "Installing Cyclone DDS RMW + ${#PACK_DEPS[@]} pack-declared host package(s): ${PACK_DEPS[*]:-<none>}"
   sudo apt-get install -y \
-    ros-jazzy-xacro \
-    ros-jazzy-robotiq-description \
-    ros-jazzy-rmw-cyclonedds-cpp
+    ros-jazzy-rmw-cyclonedds-cpp \
+    "${PACK_DEPS[@]}"
 fi
 
 log "Done. Next: ./build.sh  then  ./run.sh"

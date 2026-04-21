@@ -33,6 +33,7 @@ Isaac Sim 이미지는 `nvcr.io` 인증이 필요합니다.
 - GPU 가시성 테스트 컨테이너 1회 실행
 - `xhost +local:docker` 로 X11 권한 부여
 - NGC 로그인 상태 확인
+- `ros-jazzy-rmw-cyclonedds-cpp` (agnostic 기본 DDS) + `robots/*/host_deps.txt` 합집합 apt 설치 (예: `ros-jazzy-xacro`, `ros-jazzy-robotiq-description`). 각 pack 이 자신이 필요한 호스트 패키지를 manifest 로 선언.
 
 **idempotent**: 이미 설치된 항목은 skip.
 
@@ -49,6 +50,10 @@ Isaac Sim 이미지는 `nvcr.io` 인증이 필요합니다.
 | `logs` | 디태치 상태 로그 follow |
 | `shell` | 실행 중 컨테이너에 bash 진입 |
 | `restart` | down → up |
+| `convert` | `$ROBOT_PACK/convert_urdf.py` 를 ephemeral 컨테이너로 실행해 USD 생성 |
+| `list` | `robots/*/robot.yaml` 을 파싱해 사용 가능한 pack 목록 (이름 · DoF · sim.mode · root_link) 출력 |
+
+pack 전환: `ROBOT=<name> ./run.sh ...` 또는 `ROBOT_PACK=/workspace/robots/<name> ./run.sh ...`. 기본값은 `ROBOT=ur5e`.
 
 ## 최초 기동 절차
 
@@ -73,11 +78,13 @@ Isaac Sim GUI 창이 뜨고, 터미널에는 다음 로그가 보여야 함 (UR5
 [launch_sim] World dt: mode=freerun rendering_dt=0.01667s physics_dt=0.00417s substeps=4
 [launch_sim] Repaired joint chain: rewrote body0 on 11 joints, kept 1 world-anchor joint(s)
 [launch_sim] Patched 6 revolute joints with stiffness=10000.0, damping=100.0
-[launch_sim] Newton articulation ready: count=1 max_dofs=6 dof_names=['shoulder_pan_joint', ..., 'wrist_3_joint']
+[launch_sim] Newton articulation ready: count=1 max_dofs=6 yaml_joints=6 dof_names=['shoulder_pan_joint', ..., 'wrist_3_joint']
 [launch_sim] rclpy bridge ready: publish /joint_states, subscribe /joint_command
 [PhysicsBackendCheck] physxScene:solverType=TGS
 [launch_sim] Newton + ROS2 bridge + robot bootstrap complete. Running simulation loop.
 ```
+
+`yaml_joints` 는 `robot.yaml::joint_names` 길이, `max_dofs` 는 Newton articulation 의 실제 DoF. 불일치 시 `isaacsim_bridge.newton_view` 가 actionable RuntimeError 로 부팅 차단 — yaml 나 URDF 가 어긋났다는 신호.
 
 `sim.mode: sync` 로 전환 시 대신 다음 로그가 추가로 보임:
 
@@ -146,6 +153,21 @@ ros2 topic pub --once /joint_command sensor_msgs/msg/JointState \
 ```bash
 ROS_DOMAIN_ID=7 ./run.sh        # 컨테이너에 주입
 export ROS_DOMAIN_ID=7          # 호스트 쉘에서도 일치시켜야 discovery 됨
+```
+
+## 테스트
+
+```bash
+cd isaac_scripts
+pytest isaacsim_bridge/tests/ -v --ignore=isaacsim_bridge/tests/integration
+# 호스트 유닛 테스트 (config validator · DOF map). Isaac Sim 미필요, <1s.
+
+pytest -m phase6 isaacsim_bridge/tests/integration/test_phase6_dual_pack.py -v
+# Pack 별 agnostic-layer regression gate. robots/*/robot.yaml auto-discover.
+# 컨테이너 부팅 ~60s/pack. 새 pack 추가 시 테스트 코드 수정 불필요.
+
+pytest -m phase12 isaacsim_bridge/tests/integration/test_phase1_2_usd_patches.py -v
+# USD 패치 per-patch 회귀 (URDFImporter 3.2.1 기준). 환경 업그레이드 후 재확인용.
 ```
 
 ## DDS 구현 전환

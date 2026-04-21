@@ -58,10 +58,17 @@ def setup_newton_articulation(prim_path: str) -> tuple:
     )
     dof_names = list(dof_names_nested[0]) if dof_names_nested else []
 
-    index_map = build_dof_index_map(list(ROBOT_CFG["joint_names"]), dof_names)
+    yaml_joint_names = list(ROBOT_CFG["joint_names"])
+    if art.max_dofs != len(yaml_joint_names):
+        raise RuntimeError(
+            f"DOF count mismatch: robot.yaml lists {len(yaml_joint_names)} joint(s) "
+            f"({yaml_joint_names}) but Newton articulation has max_dofs={art.max_dofs} "
+            f"({dof_names}). Fix robot.yaml::joint_names or the URDF chain."
+        )
+    index_map = build_dof_index_map(yaml_joint_names, dof_names)
 
     carb.log_warn(
         f"[launch_sim] Newton articulation ready: count={art.count} "
-        f"max_dofs={art.max_dofs} dof_names={dof_names}"
+        f"max_dofs={art.max_dofs} yaml_joints={len(yaml_joint_names)} dof_names={dof_names}"
     )
     return sim_view, art, index_map
