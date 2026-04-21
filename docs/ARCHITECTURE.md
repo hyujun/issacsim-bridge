@@ -27,7 +27,7 @@ World.step()             [Isaac Sim 프로세스]
         ├─ /joint_command → ───────┼──────────────────────────────┘ (write targets)
         └─ /joint_states  ← ───────┼──────────────────────────────── (read positions, sim-time stamp)
                                    │
-                                   │  FastRTPS / CycloneDDS
+                                   │  Cyclone DDS (기본) / FastRTPS
                                    │  (network_mode: host)
                                    ▼
                              ros2 topic /clock, /joint_states, /joint_command

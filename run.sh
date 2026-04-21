@@ -13,6 +13,9 @@ fi
 : "${ROS_DOMAIN_ID:=0}"
 export ROS_DOMAIN_ID
 
+: "${RMW_IMPLEMENTATION:=rmw_cyclonedds_cpp}"
+export RMW_IMPLEMENTATION
+
 # Robot pack selector — picks which robots/<name>/ directory the sim loads.
 # Override: ROBOT=hand ./run.sh, or set ROBOT_PACK directly to a container path.
 : "${ROBOT:=ur5e}"

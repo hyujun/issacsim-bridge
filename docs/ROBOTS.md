@@ -7,7 +7,7 @@
 | 레이어 | 성격 | 위치 |
 |---|---|---|
 | Isaac Sim bootstrap (Newton, ROS 2 bridge, `/clock`, joint bridge 루프) | **robot-agnostic** | `isaac_scripts/launch_sim.py` + `isaac_scripts/isaacsim_bridge/` |
-| Sim/infra 설정 (Docker, ROS 도메인, FastDDS 전송) | **robot-agnostic** | `docker/`, `install.sh`, `build.sh`, `run.sh` |
+| Sim/infra 설정 (Docker, ROS 도메인, DDS 전송) | **robot-agnostic** | `docker/`, `install.sh`, `build.sh`, `run.sh` |
 | URDF, USD, joint 이름, home pose, drive 게인 | **robot-specific** | `robots/<name>/` |
 
 `launch_sim.py` / `isaacsim_bridge/` 안에는 로봇 이름·조인트 수·드라이브 튜닝이 하드코딩돼 있지 않습니다. 반대로 `robots/<name>/` 안에는 Isaac Sim 부트스트랩 코드가 들어가지 않습니다.

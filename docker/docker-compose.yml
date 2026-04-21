@@ -22,10 +22,14 @@ services:
       - NVIDIA_DRIVER_CAPABILITIES=all
       - ROS_DOMAIN_ID=${ROS_DOMAIN_ID:-0}
       - ROS_DISTRO=jazzy
-      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_fastrtps_cpp}
-      # Container runs as root, host as a regular user. FastDDS SHM transport would
-      # create /dev/shm files root-owned, breaking host<->container delivery.
-      # Force UDPv4-only transport (host must also export this — see SETUP.md).
+      # Default: Cyclone DDS. Root/user /dev/shm permission issue that plagued
+      # FastDDS SHM does not apply to Cyclone — no transport overrides needed.
+      # Override to FastDDS: RMW_IMPLEMENTATION=rmw_fastrtps_cpp ./run.sh
+      - RMW_IMPLEMENTATION=${RMW_IMPLEMENTATION:-rmw_cyclonedds_cpp}
+      # Only consulted when RMW_IMPLEMENTATION=rmw_fastrtps_cpp. FastDDS SHM
+      # transport creates /dev/shm files as root (container user), which the
+      # host user cannot read — forcing UDPv4-only works around it. No-op under
+      # Cyclone. Host shell must export the same when using FastDDS.
       - FASTDDS_BUILTIN_TRANSPORTS=UDPv4
       # isaacsim.ros2.core ships its own rmw/rclpy libs. Must be on LD_LIBRARY_PATH
       # or the bridge fails with "libament_index_cpp.so: cannot open shared object file".

@@ -72,7 +72,7 @@ isaacsim-bridge/
 - [x] Phase 2 — Docker 환경 정의
 - [x] Phase 3 — `launch_sim.py` 최소본 (Newton + `/clock`)
 - [x] Phase 0 — 실제 기동 & Newton 활성 런타임 검증 (Newton Physics experience, GUI up)
-- [x] Phase 4 — Bridge 통신 검증 (호스트에서 `/clock` ≈ 60Hz 수신, FastDDS UDPv4 전송)
+- [x] Phase 4 — Bridge 통신 검증 (호스트에서 `/clock` ≈ 60Hz 수신, Cyclone DDS 기본; FastDDS 는 env override)
 - [x] Phase 5 — UR5e 로드 + joint bridge
     - [x] URDF → USD 변환, GUI 에 UR5e 표시, `/clock` 정상
     - [x] OmniGraph joint bridge 포기 (PhysX-tensor SEGV) → rclpy sidechannel + Newton ArticulationView

@@ -220,10 +220,17 @@ Discovery는 되지만 메시지가 발행되지 않는 상태. `OnPlaybackTick`
    ros2 topic list
    ```
 2. `ROS_DOMAIN_ID` 호스트/컨테이너 일치 확인
-3. `RMW_IMPLEMENTATION` 일치 (양쪽 모두 `rmw_fastrtps_cpp` 기본). 다르면 호스트 쉘에서도 동일하게 export.
-4. 호스트에서 FastRTPS 사용 시 multicast 차단된 네트워크면 discovery 실패 → 로컬 localhost-only 모드 사용:
+3. `RMW_IMPLEMENTATION` 일치 (양쪽 모두 `rmw_cyclonedds_cpp` 기본). 다르면 호스트 쉘에서도 동일하게 export:
    ```bash
+   export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+   ```
+   FastDDS 로 폴백했다면 양쪽 모두 `rmw_fastrtps_cpp` + `FASTDDS_BUILTIN_TRANSPORTS=UDPv4` 로 맞춰야 함 (SETUP.md "DDS 구현 전환" 참조).
+4. multicast 차단된 네트워크에서 discovery 실패 시 localhost-only 로:
+   ```bash
+   # FastDDS
    export ROS_LOCALHOST_ONLY=1
+   # Cyclone DDS — CYCLONEDDS_URI 로 localhost interface 강제
+   export CYCLONEDDS_URI='<CycloneDDS><Domain><General><Interfaces><NetworkInterface name="lo" multicast="true"/></Interfaces></General></Domain></CycloneDDS>'
    ```
 
 ### `ROS2PublishClock` 노드 타입 없음 / `ROS2 Bridge startup failed`

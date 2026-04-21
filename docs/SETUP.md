@@ -96,13 +96,13 @@ Isaac Sim GUI 창이 뜨고, 터미널에는 다음 로그가 보여야 함 (UR5
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-export FASTDDS_BUILTIN_TRANSPORTS=UDPv4   # 컨테이너(root)<->호스트(user) SHM 권한 회피
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp   # 컨테이너 기본값과 일치
 ros2 topic list                  # /clock 포함 여부
 ros2 topic hz /clock             # 주기 측정
 ros2 topic echo /clock --once    # 메시지 1건 확인
 ```
 
-> `FASTDDS_BUILTIN_TRANSPORTS=UDPv4` 가 양쪽(컨테이너·호스트)에 **모두** 세팅돼야 함. 한쪽만이면 FastDDS 가 SHM 을 우선 시도해 payload 가 막힘. compose 에는 영구 세팅돼 있음.
+> 컨테이너·호스트 양쪽 모두 `RMW_IMPLEMENTATION` 이 일치해야 discovery 됨. 기본은 Cyclone DDS — FastDDS 의 root/user SHM 권한 문제가 원천적으로 없어 추가 transport 환경변수가 필요 없음. FastDDS 폴백은 아래 "DDS 구현 전환" 참조.
 
 ## 로봇 에셋 준비 (robot pack 규약)
 
@@ -130,7 +130,7 @@ ROBOT=my_arm ./run.sh            # robots/my_arm/ 를 로드
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-export FASTDDS_BUILTIN_TRANSPORTS=UDPv4
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 
 ros2 topic hz /joint_states
 ros2 topic echo /joint_states --once
@@ -147,6 +147,23 @@ ros2 topic pub --once /joint_command sensor_msgs/msg/JointState \
 ROS_DOMAIN_ID=7 ./run.sh        # 컨테이너에 주입
 export ROS_DOMAIN_ID=7          # 호스트 쉘에서도 일치시켜야 discovery 됨
 ```
+
+## DDS 구현 전환
+
+기본은 **Cyclone DDS** (`rmw_cyclonedds_cpp`). 컨테이너·호스트 양쪽 모두 같은 RMW 여야 discovery 됨. host 측 `ros-jazzy-rmw-cyclonedds-cpp` 는 `install.sh` 가 설치함. 컨테이너 측 `librmw_cyclonedds_cpp.so` 는 Isaac Sim 이미지에 이미 번들돼 있음.
+
+FastDDS 로 폴백하려면 컨테이너·호스트 둘 다 override:
+
+```bash
+# 컨테이너
+RMW_IMPLEMENTATION=rmw_fastrtps_cpp ./run.sh
+
+# 호스트 쉘 (모든 ros2 CLI 세션마다)
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+export FASTDDS_BUILTIN_TRANSPORTS=UDPv4   # 컨테이너(root)<->호스트(user) SHM 권한 회피, 양쪽 모두 필수
+```
+
+`FASTDDS_BUILTIN_TRANSPORTS=UDPv4` 는 `docker-compose.yml` 에 이미 영구 세팅돼 있어 컨테이너 쪽은 추가 작업 없음 — host 쉘만 export 해주면 됨. Cyclone 사용 시에는 이 변수 자체가 no-op.
 
 ## 종료
 

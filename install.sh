@@ -76,10 +76,11 @@ if [ ! -d /opt/ros/jazzy ]; then
   warn "ROS 2 Jazzy not found at /opt/ros/jazzy — skipping robot description packages."
   warn "Install ROS 2 Jazzy first (https://docs.ros.org/en/jazzy/Installation.html), then re-run ./install.sh"
 else
-  log "Installing robot URDF description packages"
+  log "Installing robot URDF description packages and Cyclone DDS RMW"
   sudo apt-get install -y \
     ros-jazzy-xacro \
-    ros-jazzy-robotiq-description
+    ros-jazzy-robotiq-description \
+    ros-jazzy-rmw-cyclonedds-cpp
 fi
 
 log "Done. Next: ./build.sh  then  ./run.sh"
